@@ -39,5 +39,11 @@ A sample script has been provided; Sample_Roundtrip.ps1 which contains examples 
 5.	Please note, the modules are set up for a 32-bit system as SDL Trados Studio runs as a 32-bit application.  Please run the (x86) version of the PowerShell command prompt.
 6.	To run on a 64-bit system, the paths in the modules must be changed from **C:\Program Files\SDL\SDL Trados Studio\Studio2\ to C:\Program Files (x86)\SDL\SDL Trados Studio\Studio2\** before running any script. 
 
- 
+##Contribution
+
+You want to add a new functionality or you spot a bug please fill free to create a [pull request](https://guides.github.com/activities/contributing-to-open-source/) with your changes.
+
+##Issues
+
+If you find an issue you report it [here](https://github.com/sdl/Sdl-studio-powershell-toolkit/issues).
 
