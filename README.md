@@ -55,7 +55,7 @@ E.g. C:\users\{your_user_name}\Documents\windowspowershell
 
 ##Contribution
 
-You want to add a new functionality or you spot a bug please fill free to create a [pull request](https://guides.github.com/activities/contributing-to-open-source/) with your changes.
+You want to add a new functionality or you spot a bug please fill free to create a [pull request](http://www.codenewbie.org/blogs/how-to-make-a-pull-request) with your changes.
 
 ##Issues
 
