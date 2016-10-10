@@ -1,63 +1,49 @@
-PowerShell Toolkit
-=============
+﻿SDL Trados Studio Automation Kit (STraSAK)
+==========================================
 
 ## Introduction
-The SDL PowerShell Toolkit allows you to script the [Project Automation API](http://producthelp.sdl.com/SDK/ProjectAutomationApi/3.0/html/b986e77a-82d2-4049-8610-5159c55fddd3.htm) that is available with SDL Trados Studio Professional.  In order to use the Project Automation API via the SDL PowerShell Toolkit , a Professional license for SDL Trados Studio is required.
-PowerShell 2.0 comes pre-installed on Windows 7. On Windows XP, you may need to manually install PowerShell if it is not already installed.
-## PowerShell Toolkit Structure
-The PowerShell Toolkit consists of 4 modules and a sample script:
+SDL Trados Studio Automation Kit allows to automate repetitive tasks like project creation, translation packages creation, return packages import, files export, etc.
 
-•	**GetGuids**
+In localization engineer's daily work, projects often use more-or-less fixed process and structure:
+- master TMs are stored in a fixed location
+- individual handoffs use fixed (sub)folders structure *(location of the prepared source files is known, location where the Trados Studio project should be created is known, etc...)*
+- Trados projects are usually named using a fixed scheme *(e.g. after the handoff name)*
+- source language is (almost) always the same... target languages are also often the same...
+- and so on...
 
-•	**PackageHelper**
+This means that all these _parameters_ required for Trados Studio operations should not need to be manually entered over and over again, requiring gazzillion of clicks in the Studio GUI.
+A script should be able to use all this known data and do everything automatically...
 
-•	**ProjectHelper**
+And that's exactly what this automation kit is for – to allow engineers to automate Trados-related operation using simple scripts.
 
-•	**TMHelper**
+## Technical info
+Automation is based on SDL PowerShell Toolkit (https://github.com/sdl/Sdl-studio-powershell-toolkit) with own customizations and enhancements. The kit consists of two parts:
 
-A sample script has been provided; Sample_Roundtrip.ps1 which contains examples to create translation memories, projects and packages.
+ - **PowerShell modules** containing the actual automation
+ - **Windows batch wrapper/launcher script** for easy invocation of the PowerShell functions from command line
 
-## Installation of PowerShell Toolkit
-1.	Ensure SDL Trados Studio with a professional license is installed.
-2.	Create the following 2 folders:
+## Installation and setup
+1.	**Create `WindowsPowerShell` subfolder** in your `Documents` folder  
+(i.e. the result will be `C:\Users\<YourProfile>\Documents\WindowsPowerShell`)  
+**NOTE**: If you moved your Documents folder to another location, create the subfolder in that location.
+2.	**Copy the entire `Modules` folder** (including the folder structure) into the created `WindowsPowerShell` folder.
+3.	**Put the `TS2015.cmd` wrapper script** to any preferred location and **add the location to your PATH environment variable**, so that you can run the script without specifying its full path.  
+See https://www.java.com/en/download/help/path.xml for more information about PATH variable and how to edit its content in different operating systems.  
+_(Optionally you can put the script to a location which is already listed in the PATH variable... but that may be uncomfortable, depeding on particular system setup, etc.)_
 
-    a.	C:\users\{your_user_name}\Documents\windowspowershell
-    
-    b.	C:\users\{your_user_name}\Documents\windowspowershell\modules
-  
-3.	Copy the Sample_Roundtrip.ps1 into \windowspowershell.
-4.	Copy the four PowerShell module folders into \modules:
+That's all... the kit is now ready for use!
 
-    a.	\windowspowershell\modules\GetGuids
-  
-    b.	\windowspowershell\modules\PackageHelper
-    
-    c.	\windowspowershell\modules\ProjectHelper
-    
-    d.	\windowspowershell\modules\TMHelper
-  
-5.	Please note, the modules are set up for a 32-bit system as SDL Trados Studio runs as a 32-bit application.  Please run the (x86) version of the PowerShell command prompt.
-6.	To run on a 64-bit system, the paths in the modules must be changed from **C:\Program Files\SDL\SDL Trados Studio\Studio2\ to C:\Program Files (x86)\SDL\SDL Trados Studio\Studio2\** before running any script. 
+## Usage
+### In Windows batch script
+Call the wrapper script with desired action command and its parameters as command line arguments:  
+`call TS2015 New-Project -Name "My project" -Location "D:\My project" ...`
 
-## Using the sample script
+If the wrapper script's location is not listed in PATH environment variable, you need to use full path to script:  
+`call "C:\My scripts\TS2015.cmd" New-Project -Name "My project" -Location "D:\My project" ...`
 
-1.	In the script, ensure the paths to the files to be processed match your directory structure.
+### In Powershell script
+Call the desired PowerShell function with corresponding parameters directly from your PowerShell script:  
+`New-Project -Name "My project" -Location "D:\Projects\My project" ...`
 
-2.	Open a PowerShell command prompt as Administrator.
-
-3.	Change to the directory where your script is located:
-E.g. C:\users\{your_user_name}\Documents\windowspowershell
-
-4.	Ensure you have rights to run the script. You may first need to enter the following command:
-“Set-ExecutionPolicy remotesigned”.
-
-5.	Run your script as follows: Type “.\Sample_Roundtrip” and press enter.
-
-##Contribution
-
-You want to add a new functionality or you spot a bug please fill free to create a [pull request](http://www.codenewbie.org/blogs/how-to-make-a-pull-request) with your changes.
-
-##Issues
-
-If you find an issue you report it [here](https://github.com/sdl/Sdl-studio-powershell-toolkit/issues).
-
+### In other scripting languages  
+Use the language's appropriate method to call either the batch wrapper, or the PowerShell function.
