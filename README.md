@@ -1,5 +1,5 @@
 ﻿SDL Trados Studio Automation Kit (STraSAK)
-=============
+==========================================
 
 ## Introduction
 In localization engineer's daily work, many projects use more-or-less fixed process and structure:
@@ -12,6 +12,7 @@ In localization engineer's daily work, many projects use more-or-less fixed proc
 So... it should not be necessary to enter **manually** all these parameters required for Trados Studio operations over and over again... some **script** should be able to use all this known data and do everything automatically.
 
 And that's the purpose of this automation kit – to allow engineers to automate Trados-related operation using simple scriptable commands:
+
 Command                 | Description
 ------------------------|------------
 **New-Project**         | Create new project – optionally based on project template or another project – in specified location, using specified source and target languages and TMs from specified location. Get source files from specified location and automatically convert them to translatable format and copy them to target languages. Optionally also pre-translate and analyze the files, saving results to Trados 2007-formatted log.
