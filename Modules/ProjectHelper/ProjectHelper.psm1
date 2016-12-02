@@ -424,7 +424,7 @@ Same as previous example, but using more 'PowerShell-ish' way – converts the "
 		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " Repetitions",([int]$Item.analyse.crossFileRepeated.segments + [int]$Item.analyse.repeated.segments).ToString("n0",$culture),([int]$Item.analyse.crossFileRepeated.words + [int]$Item.analyse.repeated.words).ToString("n0",$culture),$null,([int]$Item.analyse.crossFileRepeated.placeables + [int]$Item.analyse.repeated.placeables).ToString("n0",$culture)
 		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " 100%",([int]$Item.analyse.exact.segments).ToString("n0",$culture),([int]$Item.analyse.exact.words).ToString("n0",$culture),$null,([int]$Item.analyse.exact.placeables).ToString("n0",$culture)
 		$Item.analyse.fuzzy | ForEach {
-			$intfuzzy = $Item.analyse.internalFuzzy | where {$_.min -eq $min}
+			$intfuzzy = $Item.analyse.internalFuzzy | where min -eq $_.min
 			"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " $($_.min)% - $($_.max)%",([int]$_.segments + [int]$intfuzzy.segments).ToString("n0",$culture),([int]$_.words + [int]$intfuzzy.words).ToString("n0",$culture),$null,([int]$_.placeables + [int]$intfuzzy.placeables).ToString("n0",$culture)
 		} | Sort-Object -Descending
 		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " No Match",([int]$Item.analyse.new.segments).ToString("n0",$culture),([int]$Item.analyse.new.words).ToString("n0",$culture),$null,([int]$Item.analyse.new.placeables).ToString("n0",$culture)
