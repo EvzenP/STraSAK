@@ -31,6 +31,6 @@ exit /b 0
 [cultureinfo]::DefaultThreadCurrentCulture = 'en-US'
 
 # import SDL Powershell Toolkit modules
-$StudioVersion = "Studio4"
+$StudioVersion = "Studio5"
 $Modules = @("TMHelper","ProjectHelper","GetGuids","PackageHelper")
 ForEach ($Module in $Modules) {Import-Module -Name $Module -ArgumentList $StudioVersion}
