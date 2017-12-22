@@ -10,6 +10,9 @@ else {
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.FileBased.dll"
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.Core.dll"
 
+$ProjectPackageExtension = ".sdlppx"
+$ReturnPackageExtension = ".sdlrpx"
+
 function Export-Package {
 <#
 .SYNOPSIS
@@ -59,7 +62,7 @@ project TM will not be included in package, main TM and termbase will be include
 		# UseExisting - include existing project TM
 		# CreateNew - create new project TM
 		[ValidateSet("None","UseExisting","CreateNew")]
-		[Alias("PrjTM")]
+		[Alias("PrjTM","ProjectTMs")]
 		[String] $ProjectTM = "None",
 
 		# Optional short comment to be included in package
@@ -67,32 +70,32 @@ project TM will not be included in package, main TM and termbase will be include
 		[String] $PackageComment = "",
 
 		# Include AutoSuggest dictionaries in package
-		[Alias("IncAS")]
+		[Alias("IncAS","IncludeAutoSuggest")]
 		[Switch] $IncludeAutoSuggestDictionaries,
 
 		# Include main translation memories in package
-		[Alias("IncTM")]
+		[Alias("IncTM","IncludeMainTM")]
 		[Switch] $IncludeMainTMs,
 
 		# Include termbases in package
-		[Alias("IncTB")]
+		[Alias("IncTB","IncludeTermbase")]
 		[Switch] $IncludeTermbases,
 
 		# Recompute wordcount and analysis to update cross-file repetition counts
 		# and include the recomputed reports in package
-		[Alias("RecAna")]
+		[Alias("RecAna","RecomputeAnalyse","RecomputeAnalyze")]
 		[Switch] $RecomputeAnalysis,
 
 		# Include existing wordcount reports in package
-		[Alias("IncRep")]
+		[Alias("IncRep","IncludeExistingReport","IncludeReports","IncludeReport")]
 		[Switch] $IncludeExistingReports,
 
 		# Keep automated translation providers information in package
-		[Alias("KeepAT")]
+		[Alias("KeepAT","KeepATProviders","KeepATProvider")]
 		[Switch] $KeepAutomatedTranslationProviders,
 
 		# Remove links to server-based translation memories from package
-		[Alias("RmvSrvTM")]
+		[Alias("RmvSrvTM","RemoveServerTMs","RemoveServerTM")]
 		[Switch] $RemoveServerBasedTMs
 	)
 
@@ -108,21 +111,49 @@ project TM will not be included in package, main TM and termbase will be include
 	$PackageOptions.ProjectTranslationMemoryOptions = [Sdl.ProjectAutomation.Core.ProjectTranslationMemoryPackageOptions] $ProjectTM
 
 	# Workaround for "create new project TM" option not actually working unless "include reports" is also set
-	if ($ProjectTM -eq "CreateNew") {if ($PackageOptions.IncludeReports) {$PackageOptions.IncludeReports = $true}}
+	if ($ProjectTM -eq "CreateNew") {
+		# if the IncludeReports property exists, set it to true
+		# (this property was introduced only in Studio 2015 SR2 CU7)
+		if ($PackageOptions.IncludeReports) {
+			$PackageOptions.IncludeReports = $true
+		}
+	}
 
 	# Set options according to provided switches
-	if ($IncludeAutoSuggestDictionaries) {$PackageOptions.IncludeAutoSuggestDictionaries = $true}
-	if ($IncludeMainTMs) {$PackageOptions.IncludeMainTranslationMemories = $true}
-	if ($IncludeTermbases) {$PackageOptions.IncludeTermbases = $true}
-	if ($KeepAutomatedTranslationProviders) {$PackageOptions.RemoveAutomatedTranslationProviders = $false}
-	if ($RemoveServerBasedTMs) {$PackageOptions.RemoveServerBasedTranslationMemories = $true}
+	if ($IncludeAutoSuggestDictionaries) {
+		$PackageOptions.IncludeAutoSuggestDictionaries = $true
+	}
+	if ($IncludeMainTMs) {
+		$PackageOptions.IncludeMainTranslationMemories = $true
+	}
+	if ($IncludeTermbases) {
+		$PackageOptions.IncludeTermbases = $true
+	}
+	if ($KeepAutomatedTranslationProviders) {
+		$PackageOptions.RemoveAutomatedTranslationProviders = $false
+	}
+	if ($RemoveServerBasedTMs) {
+		$PackageOptions.RemoveServerBasedTranslationMemories = $true
+	}
 	if ($IncludeExistingReports) {
-		if ($PackageOptions.IncludeExistingReports) {$PackageOptions.IncludeExistingReports = $true}
-		if ($PackageOptions.IncludeReports) {$PackageOptions.IncludeReports = $true}
+		# if the IncludeExistingReports property exists, set it to true
+		# (this property was introduced only in Studio 2015 SR2 CU7)
+		if ($PackageOptions.IncludeExistingReports) {
+			$PackageOptions.IncludeExistingReports = $true
+		}
+		# if the IncludeReports property exists, set it to true
+		# (this property was introduced only in Studio 2015 SR2 CU7)
+		if ($PackageOptions.IncludeReports) {
+			$PackageOptions.IncludeReports = $true
+		}
 	}
 	if ($RecomputeAnalysis) {
 		$PackageOptions.RecomputeAnalysisStatistics = $true
-		if ($PackageOptions.IncludeReports) {$PackageOptions.IncludeReports = $true}
+		# if the IncludeReports property exists, set it to true
+		# (this property was introduced only in Studio 2015 SR2 CU7)
+		if ($PackageOptions.IncludeReports) {
+			$PackageOptions.IncludeReports = $true
+		}
 	}
 
 	# According to info from SDL developer forum, using [DateTime]::MaxValue sets "no package due date"
@@ -147,9 +178,9 @@ project TM will not be included in package, main TM and termbase will be include
 		$Language = $_
 		$User = "$($Language.IsoAbbreviation) translator"
 		# Set package name to project name with target language ISO code suffix
-		$PackageName = $Project.GetProjectInfo().Name + "_" + $($Language.IsoAbbreviation)
+		$PackageName = "$($Project.GetProjectInfo().Name)_$($Language.IsoAbbreviation)"
 
-		Write-Host "$PackageName"
+		Write-Host "$PackageName$ProjectPackageExtension"
 
 		# Get TaskFileInfo (files list) data for the target language's project files
 		[Sdl.ProjectAutomation.Core.TaskFileInfo[]] $TaskFiles = Get-TaskFileInfoFiles $Project $Language
@@ -160,9 +191,8 @@ project TM will not be included in package, main TM and termbase will be include
 		[Sdl.ProjectAutomation.Core.ProjectPackageCreation] $Package = $Project.CreateProjectPackage($ManualTask.Id, $PackageName, $PackageComment, $PackageOptions, ${function:Write-PackageProgress}, ${function:Write-PackageMessage})
 
 		# Save the package to file in specified location
-		$PackagePath = $PackageLocation + "\" + $PackageName + ".sdlppx"
 		if ($Package.Status -eq [Sdl.ProjectAutomation.Core.PackageStatus]::Completed) {
-			$Project.SavePackageAs($Package.PackageId, $PackagePath)
+			$Project.SavePackageAs($Package.PackageId, "$PackageLocation\$PackageName$ProjectPackageExtension")
 		}
 		else {
 			Write-Host "Package creation failed, cannot save it!"
@@ -196,17 +226,20 @@ Imports single  translation package from "D:\Packages\Handback_en-US_fi-FI.sdlrp
 		[String] $ProjectLocation,
 
 		# Path to either a single package, or directory where multiple packages are located.
-		# If directory is specified, all its subdirectories are searched recursively for return packages (*sdlrpx).
 		[Parameter (Mandatory = $true)]
 		[Alias("PkgLoc")]
-		[String] $PackageLocation
+		[String] $PackageLocation,
+
+		# Imports also all return packages found in subdirectories of the specified path.
+		[Alias("r")]
+		[switch] $Recurse
 	)
 
 	$Project = Get-Project (Resolve-Path -LiteralPath $ProjectLocation).ProviderPath
 
 	Write-Host "`nImporting packages..." -ForegroundColor White
 
-	Get-ChildItem $PackageLocation *.sdlrpx -File -Recurse | ForEach {
+	Get-ChildItem $PackageLocation *.sdlrpx -File -Recurse:$Recurse | ForEach {
 		Write-Host "$($_.Name)"
 		$PackageImport = $Project.ImportReturnPackage($_.FullName, ${function:Write-PackageProgress}, ${function:Write-PackageMessage})
 	}
@@ -214,30 +247,51 @@ Imports single  translation package from "D:\Packages\Handback_en-US_fi-FI.sdlrp
 
 function Write-PackageProgress {
 	param(
-	[Sdl.ProjectAutomation.FileBased.FileBasedProject] $Project,
-	[Sdl.ProjectAutomation.Core.PackageStatusEventArgs] $ProgressEventArgs
+	$Caller,
+	$ProgressEventArgs
 	)
 
-	$Percent = $ProgressEventArgs.PercentComplete
+	$Cancel = $ProgressEventArgs.Cancel
 	$Message = $ProgressEventArgs.StatusMessage
 
 	if ($Message -ne $null -and $Message -ne "") {
-		#Write-Progress -Activity "Processing package" -PercentComplete $Percent -Status $Message
-		Write-Host "  $Percent%	$Message"
+		$Percent = $ProgressEventArgs.PercentComplete
+		if ($Percent -eq 100) {
+			$Message = "Completed"
+		}
+
+		# write textual progress percentage in console
+		if ($host.name -eq 'ConsoleHost') {
+			Write-Host "$($Percent.ToString().PadLeft(5))%	$Message"
+			Start-Sleep -Seconds 1
+		}
+		# use PowerShell progress bar in PowerShell environment since it does not support writing on the same line using `r
+		else {
+			Write-Progress -Activity "Processing task" -PercentComplete $Percent -Status $Message
+			# when all is done, remove the progress bar
+			if ($Percent -eq 100 -and $Message -eq "Completed") {
+				Write-Progress -Activity "Processing task" -Completed
+			}
+		}
 	}
 }
 
 function Write-PackageMessage {
 	param(
-	[Sdl.ProjectAutomation.FileBased.FileBasedProject] $Project,
-	[Sdl.ProjectAutomation.Core.MessageEventArgs] $MessageEventArgs
+	$Caller,
+	$MessageEventArgs
 	)
 
 	$Message = $MessageEventArgs.Message
 
-	Write-Host "$($Message.Source)" -ForegroundColor DarkYellow
+	# do not pollute output with potentially unnecessary lines
+	if ($Message.Source -ne "Package import") {
+		Write-Host "$($Message.Source)" -ForegroundColor DarkYellow
+	}
 	Write-Host "$($Message.Level): $($Message.Message)" -ForegroundColor Magenta
-	if ($Message.Exception) {Write-Host "$($Message.Exception)" -ForegroundColor Magenta}
+	if ($Message.Exception) {
+		Write-Host "$($Message.Exception)" -ForegroundColor Magenta
+	}
 }
 
 function New-PackageOptions {
