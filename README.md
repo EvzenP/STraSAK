@@ -20,18 +20,20 @@ Command                 | Description
 **Import-Package**      | Import return packages from specified location in a specified project
 **ConvertTo-TradosLog** | Convert Studio XML-based report to Trados 2007-formatted log. _Note:_ _This command_ _**operates on individual files only**__, not on entire directories._
 **Export-TargetFiles**  | Export target files from specified project to specified location
-==Work in progress==    | *(Commands work, but some optimizations are still in progress)*
+**Update-MainTMs**       | Update main translation memories of specified project
 **New-FileBasedTM**     | Create new translation memory in specified location, using specified options
+**Export-TMX**          | Export one or more Trados Studio translation memories to TMX
 **Import-TMX**          | Import content from TMX file in a specified TM
-**Update-MainTM**       | Update main translation memories of specified project
 
 
 ## Technical info
 Automation is based on SDL PowerShell Toolkit (https://github.com/sdl/Sdl-studio-powershell-toolkit) with own extensive enhancements and customizations.
-The kit consists of two parts:
+The kit consists of:
 
  - **PowerShell modules** containing the actual automation
  - **Windows batch wrapper/launcher script** for easy invocation of the PowerShell functions from command line
+ - **PDF manual** with detailed description of functions, their parameters and usage examples
+
 
 ## Installation and setup
 0. **Pre-requisite**: Windows PowerShell 4.0 or newer (https://www.microsoft.com/en-us/download/details.aspx?id=40855)
@@ -47,6 +49,7 @@ See https://www.java.com/en/download/help/path.xml for more information about PA
 _(Optionally you can put the script to a location which is already listed in the PATH variable... but that may be uncomfortable, depeding on particular system setup, etc.)_
 
 That's all... the kit is now ready for use!
+
 
 ## Usage
 ### In Windows batch script
@@ -111,16 +114,25 @@ call TS2015 Export-TargetFiles ^
      -TargetLanguages "%TARGETLANGUAGES%"
 ```
 
+
 ## Known issues
 ### "log4net:ERROR: XmlConfigurator..." message displayed each time automation is started
 This is Trados Studio API bug. It's just a cosmetic issue and does not influence automation functionality.
 
 ### No progress is displayed during Analysis task
 This seems to be a Trados Studio API bug – activating analysis progress display causes analysis task to completely fail.
+
 Currently the only known 'workaround' is to not display progress during analysis.
 
 ### Out Of Memory error during analysis or package creation  
 This seems to be caused by some weird memory leak in Studio API if a huge TM is used for analysis or for creating Project TM (either during project creation, or when a "Create new TM" package creation option is used), which may cause Out Of Memory exception.
-As a workaround you can either use smaller/less TMs, or create packages or analyze  
-individual languages separately instead of all at once... or both.
+
+As a workaround you can try the `-PerLanguage` parameter of the `New-Project` function. Or you can try to use smaller/less TMs. Or both...
+
+### Automation fails if folder- or filename contains square brackets  
+This is PowerShell bug and there is currently no reasonable workaround... except for removing there characters from folder/file names.
+
+You can vote for fixing this bug at following links:  
+https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/15976273-powershell-fails-to-start-if-path-contains-bracket
+https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
