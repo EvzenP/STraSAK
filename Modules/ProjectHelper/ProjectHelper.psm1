@@ -20,11 +20,11 @@ switch ($StudioVersion) {
 	"Studio5" {$StudioVersionAppData = "14.0.0.0"}
 }
 # Get default project template GUID from the user settings file
-$DefaultProjectTemplateGuid = Select-Xml -Path "${Env:AppData}\SDL\SDL Trados Studio\$StudioVersionAppData\UserSettings.xml" -XPath "//Setting[@Id='DefaultProjectTemplateGuid']" | ForEach {$_.node.InnerXml}
+$DefaultProjectTemplateGuid = (Select-Xml -Path "${Env:AppData}\SDL\SDL Trados Studio\$StudioVersionAppData\UserSettings.xml" -XPath "//Setting[@Id='DefaultProjectTemplateGuid']").Node.InnerText
 # Get the location of local projects storage from ProjectApi configuration file
-$LocalDataFolder = Select-Xml -Path "${Env:AppData}\SDL\ProjectApi\$StudioVersionAppData\SDL.ProjectApi.xml" -XPath "//LocalProjectServerInfo/@LocalDataFolder" | ForEach {$_.node.Value}
+$LocalDataFolder = (Select-Xml -Path "${Env:AppData}\SDL\ProjectApi\$StudioVersionAppData\SDL.ProjectApi.xml" -XPath "//LocalProjectServerInfo/@LocalDataFolder").Node.Value
 # Finally, get the default project template path from local project storage file
-$DefaultProjectTemplate = Select-Xml -Path "$LocalDataFolder\projects.xml" -XPath "//ProjectTemplateListItem[@Guid='$DefaultProjectTemplateGuid']/@ProjectTemplateFilePath" | ForEach {$_.node.Value}
+$DefaultProjectTemplate = (Select-Xml -Path "$LocalDataFolder\projects.xml" -XPath "//ProjectTemplateListItem[@Guid='$DefaultProjectTemplateGuid']/@ProjectTemplateFilePath").Node.Value
 ##########################################################################################################
 
 function New-Project {
@@ -44,9 +44,9 @@ Following tasks are run automatically after project creation:
 - Copy to target languages
 
 Optionally also following tasks can be run:
+- PerfectMatch
 - Pretranslate
 - Analyze
-
 .EXAMPLE
 New-Project -Name "Project" -ProjectLocation "D:\Project" -SourceLocation "D:\Sources"
 
@@ -54,12 +54,10 @@ Creates project named "Project" based on default Trados Studio project template 
 source files are taken from "D:\Sources" folder;
 source language, target languages and translation memories are taken from the default project template;
 only default Scan, Convert and Copy to target languages tasks are run.
-
 .EXAMPLE
 New-Project -Name "Project" -ProjectLocation "D:\Project" -SourceLocation "D:\Sources" -SourceLanguage "en-US" -TargetLanguages "fi-FI" -TMLocation "D:\TMs" -Pretranslate -Analyze
 
 Creates project named "Project" based on default Trados Studio project template in "D:\Project" folder, with American English as source language and Finnish as target language; source files are taken from "D:\Sources" folder and translation memories are taken from "D:\TMs" folder; and runs Pretranslate and Analyze as additional tasks after scanning, converting and copying to target languages.
-
 .EXAMPLE
 New-Project -Name "Sample Project" -ProjectLocation "D:\Projects\Trados Studio Automation\Sample" -SourceLocation "D:\Projects\Trados Studio Automation\Source files" -SourceLanguage "en-GB" -TargetLanguages "de-DE,ja-JP" -TMLocation "D:\Projects\TMs\Samples" -ProjectTemplate "D:\ProjectTemplates\SampleTemplate.sdltpl" -Analyze
 
@@ -75,6 +73,7 @@ Analyze task is run after scanning, converting and copying to target languages.
 	param(
 		# Project name. Must not contain invalid characters such as \ / : * ? " < > |
 		[Parameter (Mandatory = $true)]
+		[Alias("ProjectName","PrjName")]
 		[String] $Name,
 
 		# Path to directory where the project will be created.
@@ -109,7 +108,7 @@ Analyze task is run after scanning, converting and copying to target languages.
 		[Alias("TMLoc")]
 		[String] $TMLocation,
 
-		# Path to directory where Trados 2007-formatted textual logs will be created.
+		# Path to directory where Trados 2007-formatted analysis logs will be created.
 		# Any existing logs will be overwritten.
 		[Alias("LogLoc")]
 		[String] $LogLocation,
@@ -126,16 +125,31 @@ Analyze task is run after scanning, converting and copying to target languages.
 		[String] $ProjectReference,
 
 		# Ignore TMs defined in project template or reference project and use only TMs specified by "TMLocation" parameter.
+		# If this parameter is not present, TMs specified by "TMLocation" parameter will be added to TMs defined in project template.
 		[Alias("OvrTM")]
 		[Switch] $OverrideTM,
 
-		# Run pre-translation task for each target language during project creation.
+		# Path to directory containing bilingual files to be used for applying PerfectMatch.
+		# Directory must contain subdirectories for individual languages and bilingual files in these language subdirectories must be structured exactly the same way as files in project.
+		[Alias("PM")]
+		[String] $PerfectMatch,
+
+		# Run pre-translation task for target languages during project creation.
 		[Alias("PreTra","Translate")]
 		[Switch] $Pretranslate,
 
-		# Run analysis task for each target language during project creation.
+		# Run analysis task for target languages during project creation.
 		[Alias("Analyse")]
-		[Switch] $Analyze
+		[Switch] $Analyze,
+
+		# Run all batch tasks for each target language separately, as opposed to default Studio behavior which runs batch tasks for all languages at once.
+		[Alias("PerLng","PerLang")]
+		[Switch] $PerLanguage,
+
+		# Save analysis reports in Excel XLSX format.
+		# Reports will be saved to the same location as the Trados 2007 logs.
+		[Alias("Excel")]
+		[Switch] $ExcelLog
 	)
 
 	# If project location does not exist, create it... if it does exist, empty it
@@ -181,6 +195,11 @@ Analyze task is run after scanning, converting and copying to target languages.
 		$ProjectInfo.TargetLanguages = Get-Languages $TargetLanguagesList
 	}
 
+	# If PerfectMatch parameter was specified, verify the specified path
+	if ($PerfectMatch -ne $null -and $PerfectMatch -ne "") {
+		$BilingualsPath = (Resolve-Path -LiteralPath $PerfectMatch).ProviderPath
+	}
+
 	# Crete new project using creation reference and constructed project info
 	$Project = New-Object Sdl.ProjectAutomation.FileBased.FileBasedProject ($ProjectInfo, $ProjectCreationReference)
 
@@ -222,13 +241,89 @@ Analyze task is run after scanning, converting and copying to target languages.
 				$Project.UpdateTranslationProviderConfiguration($TMTargetLanguage, $TMConfig)
 				Write-Host "$TMPath added to project"
 			}
-			else {Write-Host "$TMPath already in project"}
+			else {
+				Write-Host "$TMPath already in project"
+			}
 		}
+	}
+
+	# scriptblock for running automatic tasks (see below)
+	$ProcessAutomaticTasks = {
+		
+		param($LangsToProcess)
+		
+		# get IDs of target files to be processed
+		[System.Guid[]] $TargetFilesGuids = @()
+		ForEach ($TargetLanguage in $LangsToProcess) {
+			$TargetFiles = $Project.GetTargetLanguageFiles($TargetLanguage)
+			$TargetFilesGuids += Get-Guids $TargetFiles
+		}
+		
+		# run (and then validate) the task sequence
+		if ($TaskSequence -contains [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PreTranslateFiles -or $TaskSequence -contains [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::AnalyzeFiles) {
+			$Tasks = $Project.RunAutomaticTasks($TargetFilesGuids, $TaskSequence, $null, ${function:Write-TaskMessage})
+		}
+		else {
+			$Tasks = $Project.RunAutomaticTasks($TargetFilesGuids, $TaskSequence, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+		}
+		Validate-TaskSequence $Tasks
+		
+		# save analysis logs
+		if ($Analyze -and $LogLocation) {
+			if (!($PerLanguage)) {Write-Host "`n" -NoNewLine}
+			Write-Host "Saving logs..." -ForegroundColor White
+			ForEach ($T in $Tasks.SubTasks) {
+				ForEach ($R in $T.Reports) {
+					if ($R.TaskTemplateId -eq [string] [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::AnalyzeFiles) {
+						# Save report to temporary file
+						$TempFile = [System.IO.Path]::GetTempFileName()
+						$Project.SaveTaskReportAs($R.Id, $TempFile, [Sdl.ProjectAutomation.Core.ReportFormat]::Xml)
+						
+						# Read the LCID information from temporarily saved report and use it to create CultureInfo, which is then used to get the culture code
+						[xml] $TempReport = Get-Content -LiteralPath $TempFile
+						[int] $LCID = $TempReport.task.taskInfo.language.lcid
+						# all custom cultures share the same LCID 4096
+						# and since the only other available info in the report is the language name, we have to find the name in list of all custom cultures
+						if ($LCID -eq 4096) {
+							$ReportCulture = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::UserCustomCulture) | Where-Object -Property EnglishName -eq $TempReport.task.taskInfo.language.name
+						}
+						else {
+							$ReportCulture = New-Object System.Globalization.CultureInfo($LCID)
+						}
+						
+						# construct the log file name (without extension, which is dependent on log save format)
+						$ReportTargetLanguage = $ReportCulture.Name
+						$ReportName = ($R.Name -replace 'Report','')
+						$LogFileName = "$ReportName$SourceLanguage_$ReportTargetLanguage"
+						
+						# If log location does not exist, create it
+						if (!(Test-Path -LiteralPath $LogLocation)) {
+							New-Item $LogLocation -Force -ItemType Directory | Out-Null
+						}
+						$LogLocation = (Resolve-Path -LiteralPath $LogLocation).ProviderPath
+						
+						# Save log in Trados 2007 format
+						Write-Host "  $LogFileName.log"
+						ConvertTo-TradosLog $TempFile "$LogLocation\$LogFileName.log"
+						
+						# Save log in Excel format
+						if ($ExcelLog) {
+							Write-Host "  $LogFileName.xlsx"
+							$Project.SaveTaskReportAs($R.Id, "$LogLocation\$LogFileName.xlsx", [Sdl.ProjectAutomation.Core.ReportFormat]::Excel)
+						}
+						
+						# Delete temporarily saved report
+						Remove-Item $TempFile -Force
+					}  # if $R.TaskTemplateId -eq AnalyzeFiles
+				}  # ForEach $R in $T.Reports
+			}  # ForEach $T in $Tasks.SubTasks
+		}  # if $Analyze and $LogLocation
 	}
 
 	# Add project source files
 	Write-Host "`nAdding source files..." -ForegroundColor White
 	$ProjectFiles = $Project.AddFolderWithFiles($SourceLocation, $true)
+	Write-Host "Done"
 
 	# Get source language project files IDs
 	[Sdl.ProjectAutomation.Core.ProjectFile[]] $ProjectFiles = $Project.GetSourceLanguageFiles()
@@ -242,65 +337,50 @@ Analyze task is run after scanning, converting and copying to target languages.
 	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::ConvertToTranslatableFormat, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
 	Write-Host "Task Copy to Target Languages"
 	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::CopyToTargetLanguages, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	Write-Host "Done"
 
-	if ($Pretranslate -or $Analyze) {
-		Write-Host "`nRunning pre-translation / analysis tasks..." -ForegroundColor White
-		
-		# get IDs of all target project files
-		[System.Guid[]] $TargetFilesGuids = @()
-		ForEach ($TargetLanguage in $TargetLanguagesList) {
-			$TargetFiles = $Project.GetTargetLanguageFiles($TargetLanguage)
-			$TargetFilesGuids += Get-Guids $TargetFiles
-		}
+	if ($PerfectMatch) {
+		Write-Host "`nAssigning bilingual files for PerfectMatch..." -ForegroundColor White
+		$BilingualFileMappings = Get-BilingualFileMappings -LanguagesList $ProjectInfo.TargetLanguages -TranslatableFilesList $ProjectFiles -BilingualsPath $BilingualsPath
+		$Project.AddBilingualReferenceFiles($BilingualFileMappings)
+		Write-Host "Done"
+	}
+
+	$Project.Save()
+
+	if ($Pretranslate -or $Analyze -or $PerfectMatch) {
+		Write-Host "`nRunning automatic tasks..." -ForegroundColor White
 		
 		# construct task sequence
-		[String[]] $TasksSequence = @()
+		[String[]] $TaskSequence = @()
+		if ($PerfectMatch) {
+			$TaskSequence += [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PerfectMatch
+		}
 		if ($Pretranslate) {
-			$TasksSequence += [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PreTranslateFiles
+			$TaskSequence += [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PreTranslateFiles
 		}
 		if ($Analyze) {
-			$TasksSequence += [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::AnalyzeFiles
+			$TaskSequence += [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::AnalyzeFiles
 		}
-		
-		# run (and then validate) the task sequence
-		# $Tasks = $Project.RunAutomaticTasks($TargetFilesGuids, $TasksSequence, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
-		$Tasks = $Project.RunAutomaticTasks($TargetFilesGuids, $TasksSequence, $null, ${function:Write-TaskMessage})
-		Validate-TaskSequence $Tasks
-		
-		# save analysis logs
-		if ($Analyze -and $LogLocation) {
-			Write-Host "`nSaving logs..." -ForegroundColor White
-			ForEach ($T in $Tasks.SubTasks) {
-				ForEach ($R in $T.Reports) {
-					if ($R.TaskTemplateId -eq [string] [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::AnalyzeFiles) {
-						# Save report to temporary file
-						$TempFile = [System.IO.Path]::GetTempFileName()
-						$Project.SaveTaskReportAs($R.Id, $TempFile, [Sdl.ProjectAutomation.Core.ReportFormat]::Xml)
-						
-						# Read the target language information from temporarily saved report
-						[xml] $TempReport = Get-Content -LiteralPath $TempFile
-						$ReportCulture = New-Object System.Globalization.CultureInfo([int]$TempReport.task.taskInfo.language.lcid)
-						
-						# If log location does not exist, create it
-						if (!(Test-Path -LiteralPath $LogLocation)) {
-							New-Item $LogLocation -Force -ItemType Directory | Out-Null
-						}
-						$LogLocation = (Resolve-Path -LiteralPath $LogLocation).ProviderPath
-						$LogName = ($R.Name -replace 'Report','') + $SourceLanguage + "_" + $ReportCulture.Name + ".log"
-						Write-Host $LogName
-						ConvertTo-TradosLog $TempFile | Out-File -LiteralPath ($LogLocation + "\" + $LogName) -Encoding UTF8 -Force
-						
-						# Delete temporarily saved report
-						#Remove-Item $TempFile -Force
-					}
-				}
+
+		# run the task sequence, either per language or all languages at once
+		if ($PerLanguage) {
+			Write-Host "Per-language mode selected"
+			ForEach ($TargetLanguage in $TargetLanguagesList) {
+				Write-Host "Processing $TargetLanguage" -ForegroundColor Yellow
+				& $ProcessAutomaticTasks -LangsToProcess $TargetLanguage
 			}
 		}
+		else {
+			& $ProcessAutomaticTasks -LangsToProcess $TargetLanguagesList
+		}
+		Write-Host "Done"
 	}
 
 	# Save the project
 	Write-Host "`nSaving project..." -ForegroundColor White
 	$Project.Save()
+	Write-Host "Done"
 }
 
 function Get-Project {
@@ -356,37 +436,59 @@ function Get-TaskFileInfoFiles {
 		$FileInfo = New-Object Sdl.ProjectAutomation.Core.TaskFileInfo
 		$FileInfo.ProjectFileId = $Taskfile.Id
 		$FileInfo.ReadOnly = $false
-		$TaskFilesList = $TaskFilesList + $FileInfo
+		$TaskFilesList += $FileInfo
 	}
 	return $TaskFilesList
 }
 
 function Write-TaskProgress {
 	param(
-	[Sdl.ProjectAutomation.FileBased.FileBasedProject] $Project,
-	[Sdl.ProjectAutomation.Core.TaskStatusEventArgs] $ProgressEventArgs
+	$Caller,
+	$ProgressEventArgs
 	)
 
 	$Percent = $ProgressEventArgs.PercentComplete
-	$Status = $ProgressEventArgs.Status
+	if ($Percent -eq 100) {
+		$Status = "Completed"
+		$Status = $ProgressEventArgs.Status
+	}
+	else {
+		$Status = $ProgressEventArgs.Status
+	}
 
-	Write-Host "  $Percent%	$Status`r" -NoNewLine
+	$Cancel = $ProgressEventArgs.Cancel
+	$Task = $ProgressEventArgs.TaskTemplateIds
 
-#	if ($Status -ne $null -and $Status -ne "") {
-#		Write-Progress -Activity "Processing task" -PercentComplete $Percent -Status $Status
-#	}
+	# write textual progress percentage in console
+	if ($host.name -eq 'ConsoleHost') {
+		Write-Host "$($Percent.ToString().PadLeft(5))%	$Status	$StatusMessage`r" -NoNewLine
+		# when all is done, output nothing WITH NEW LINE
+		if ($Percent -eq 100 -and $Status -eq "Completed") {
+			Write-Host $null
+		}
+	}
+	# use PowerShell progress bar in PowerShell environment since it does not support writing on the same line using `r
+	else {
+		Write-Progress -Activity "Processing task" -PercentComplete $Percent -Status $Status
+		# when all is done, remove the progress bar
+		if ($Percent -eq 100 -and $Status -eq "Completed") {
+			Write-Progress -Activity "Processing task" -Completed
+		}
+	}
 }
 
 function Write-TaskMessage {
 	param(
-	[Sdl.ProjectAutomation.FileBased.FileBasedProject] $Project,
+	$Caller,
 	[Sdl.ProjectAutomation.Core.TaskMessageEventArgs] $MessageEventArgs
 	)
 
 	$Message = $MessageEventArgs.Message
-
 	Write-Host "`n$($Message.Level): $($Message.Message)" -ForegroundColor DarkYellow
-	if ($($Message.Exception) -ne $null) {Write-Host "$($Message.Exception)" -ForegroundColor Magenta}
+
+	if ($($Message.Exception) -ne $null) {
+		Write-Host "$($Message.Exception)" -ForegroundColor Magenta
+	}
 }
 
 function ConvertTo-TradosLog {
@@ -397,84 +499,175 @@ Converts Studio XML-formatted task report to Trados 2007 plain text format
 Converts Studio XML-formatted task report to Trados 2007 plain text format.
 Output can optionally contain only total summary, omitting details for individual files.
 .EXAMPLE
-ConvertTo-TradosLog -Path "D:\Project\Reports\Analyze Files_en-US_fi-FI.xml" -TotalOnly > "D:\Analyze Files_en-US_fi-FI.log"
+ConvertTo-TradosLog -Path "D:\Project\Reports\Analyze Files_en-US_fi-FI.xml" -Destination "D:\Finnish analysis.log"
 
-Converts the "D:\Project\Reports\Analyze Files_en-US_fi-FI.xml" report to Trados 2007-like plain text log and saves the result to "D:\Analyze Files_en-US_fi-FI.log" file.
+Converts the "D:\Project\Reports\Analyze Files_en-US_fi-FI.xml" report to Trados 2007-like plain text log and saves the result to "D:\Finnish analysis.log" file.
 .EXAMPLE
-ConvertTo-TradosLog -Path "D:\Project\Reports\Analyze Files_en-US_fi-FI.xml" -TotalOnly | Out-File -Path "D:\Analyze Files_en-US_fi-FI.log" -Encoding UTF-8
+ConvertTo-TradosLog -Path "D:\Project\Reports" -TotalOnly -Recurse
 
-Same as previous example, but using more 'PowerShell-ish' way – converts the "D:\Project\Reports\Analyze Files_en-US_fi-FI.xml" report to Trados 2007-like plain text log and saves the result to UTF-8 encoded  "D:\Analyze Files_en-US_fi-FI.log" file.
+Converts the all reports found in "D:\Project\Reports" directory and its subdirectories Trados 2007-like plain text logs, which will include only total summaries. Converted files will be saved in the directories along the source reports.
 #>
 	[CmdletBinding()]
 	
 	param(
-		# Path to input XML-formatted Studio report
+		# Path to either a single XML-formatted Studio report, or a directory where multiple XML reports are located.
 		[Parameter (Mandatory = $true)]
 		[String] $Path,
 		
+		# Path to a single output text file. Can be used only if Path specifies a single file, not directory.
+		# If this parameter is omitted, output file will be created in the same location as input file, using input file name and ".log" extension.
+		[String] $Destination,
+		
 		# Include only total summary (do not include analyses for individual files)
-		[Switch] $TotalOnly
+		[Switch] $TotalOnly,
+		
+		# If Path specifies a directory, convert also all task reports found in subdirectories of the specified path.
+		[Alias("r")]
+		[Switch] $Recurse
 	)
-	# 
+	#
 
 	function Write-LogItem {
 		param($Item)
-		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " Match Types","Segments","Words","Percent","Placeables"
-		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " Context TM",([int]$Item.analyse.perfect.segments + [int]$Item.analyse.inContextExact.segments).ToString("n0",$culture),([int]$Item.analyse.perfect.words + [int]$Item.analyse.inContextExact.words).ToString("n0",$culture),$null,([int]$Item.analyse.perfect.placeables + [int]$Item.analyse.inContextExact.placeables).ToString("n0",$culture)
-		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " Repetitions",([int]$Item.analyse.crossFileRepeated.segments + [int]$Item.analyse.repeated.segments).ToString("n0",$culture),([int]$Item.analyse.crossFileRepeated.words + [int]$Item.analyse.repeated.words).ToString("n0",$culture),$null,([int]$Item.analyse.crossFileRepeated.placeables + [int]$Item.analyse.repeated.placeables).ToString("n0",$culture)
-		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " 100%",([int]$Item.analyse.exact.segments).ToString("n0",$culture),([int]$Item.analyse.exact.words).ToString("n0",$culture),$null,([int]$Item.analyse.exact.placeables).ToString("n0",$culture)
+		"{0,-12}{1,10}{2,13}{3,8}{4,11}" -f " Match Types",
+							"Segments",
+							"Words",
+							"Percent",
+							"Placeables"
+		"{0,-12}{1,10}{2,13}{3,8}{4,11}" -f " Context TM",
+							([int]$Item.analyse.perfect.segments + [int]$Item.analyse.inContextExact.segments).ToString("n0",$culture),
+							([int]$Item.analyse.perfect.words + [int]$Item.analyse.inContextExact.words).ToString("n0",$culture),
+							$(
+								if ([int]$Item.analyse.total.words -gt 0) {
+									([int]$Item.analyse.perfect.words + [int]$Item.analyse.inContextExact.words) / [int]$Item.analyse.total.words * 100
+								}
+								else {
+									[int]$Item.analyse.total.words
+								}
+							).ToString("n0",$culture),
+							([int]$Item.analyse.perfect.placeables + [int]$Item.analyse.inContextExact.placeables).ToString("n0",$culture)
+		"{0,-12}{1,10}{2,13}{3,8}{4,11}" -f " Repetitions",
+							([int]$Item.analyse.crossFileRepeated.segments + [int]$Item.analyse.repeated.segments).ToString("n0",$culture),
+							([int]$Item.analyse.crossFileRepeated.words + [int]$Item.analyse.repeated.words).ToString("n0",$culture),
+							$(
+								if ([int]$Item.analyse.total.words -gt 0) {
+									([int]$Item.analyse.crossFileRepeated.words + [int]$Item.analyse.repeated.words) / [int]$Item.analyse.total.words * 100
+								}
+								else {
+									[int]$Item.analyse.total.words
+								}
+							).ToString("n0",$culture),
+							([int]$Item.analyse.crossFileRepeated.placeables + [int]$Item.analyse.repeated.placeables).ToString("n0",$culture)
+		"{0,-12}{1,10}{2,13}{3,8}{4,11}" -f " 100%",
+							([int]$Item.analyse.exact.segments).ToString("n0",$culture),
+							([int]$Item.analyse.exact.words).ToString("n0",$culture),
+							$(
+								if ([int]$Item.analyse.total.words -gt 0) {
+									[int]$Item.analyse.exact.words / [int]$Item.analyse.total.words * 100
+								}
+								else {
+									[int]$Item.analyse.total.words
+								}
+							).ToString("n0",$culture),
+							([int]$Item.analyse.exact.placeables).ToString("n0",$culture)
 		$Item.analyse.fuzzy | ForEach {
 			$intfuzzy = $Item.analyse.internalFuzzy | where min -eq $_.min
-			"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " $($_.min)% - $($_.max)%",([int]$_.segments + [int]$intfuzzy.segments).ToString("n0",$culture),([int]$_.words + [int]$intfuzzy.words).ToString("n0",$culture),$null,([int]$_.placeables + [int]$intfuzzy.placeables).ToString("n0",$culture)
+			"{0,-12}{1,10}{2,13}{3,8}{4,11}" -f " $($_.min)% - $($_.max)%",
+								([int]$_.segments + [int]$intfuzzy.segments).ToString("n0",$culture),
+								([int]$_.words + [int]$intfuzzy.words).ToString("n0",$culture),
+								$(
+									if ([int]$Item.analyse.total.words -gt 0) {
+										([int]$_.words + [int]$intfuzzy.words) / [int]$Item.analyse.total.words * 100
+									}
+									else {
+										[int]$Item.analyse.total.words
+									}
+								).ToString("n0",$culture),
+								([int]$_.placeables + [int]$intfuzzy.placeables).ToString("n0",$culture)
 		} | Sort-Object -Descending
-		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " No Match",([int]$Item.analyse.new.segments).ToString("n0",$culture),([int]$Item.analyse.new.words).ToString("n0",$culture),$null,([int]$Item.analyse.new.placeables).ToString("n0",$culture)
-		"{0,-12}{1,11}{2,13}{3,8}{4,11}" -f " Total",([int]$Item.analyse.total.segments).ToString("n0",$culture),([int]$Item.analyse.total.words).ToString("n0",$culture),$null,([int]$Item.analyse.total.placeables).ToString("n0",$culture)
+		"{0,-12}{1,10}{2,13}{3,8}{4,11}" -f " No Match",
+							([int]$Item.analyse.new.segments).ToString("n0",$culture),
+							([int]$Item.analyse.new.words).ToString("n0",$culture),
+							$(
+								if ([int]$Item.analyse.total.words -gt 0) {[int]$Item.analyse.new.words / [int]$Item.analyse.total.words * 100
+								}
+								else {
+									[int]$Item.analyse.total.words
+								}
+							).ToString("n0",$culture),
+							([int]$Item.analyse.new.placeables).ToString("n0",$culture)
+		"{0,-12}{1,10}{2,13}{3,8}{4,11}" -f " Total",
+							([int]$Item.analyse.total.segments).ToString("n0",$culture),
+							([int]$Item.analyse.total.words).ToString("n0",$culture),
+							$(
+								if ([int]$Item.analyse.total.words -gt 0) {
+									[int]$Item.analyse.total.words / [int]$Item.analyse.total.words * 100
+								}
+								else {
+									[int]$Item.analyse.total.words
+								}
+							).ToString("n0",$culture),
+							([int]$Item.analyse.total.placeables).ToString("n0",$culture)
 	}
 
+	function Write-LogFile {
+		param($File)
+		Write-Output "Start Analyse: $($report.task.taskInfo.runAt)"
+		Write-Output ""
+
+		# Temporarily redefine Output Field Separator to have possible multiple TM names nicely aligned
+		# e.g.:
+		# Translation Memory: foo.sdltm
+		#                     bar.sdltm
+		#                     foobar.sdltm
+		$tempOFS = $OFS
+		$OFS="`n".PadRight(21)
+
+		Write-Output "Translation Memory: $($report.task.taskInfo.tm.name)"
+
+		# Restore original Output Field Separator
+		$OFS = $tempOFS
+
+		Write-Output ""
+
+		$filescount = 0
+		$File.task.file | ForEach {
+			$filescount++
+			if (!($TotalOnly)) {
+					Write-Output $_.name
+					Write-Output ""
+					Write-Output $(Write-LogItem $_)
+					Write-Output ""
+			}
+		}
+
+		Write-Output "Analyse Total ($($filescount) files):"
+		Write-Output ""
+		Write-Output $(Write-LogItem $report.task.batchTotal)
+		Write-Output ""
+		Write-Output "Analyse finished successfully without errors!"
+		Write-Output ""
+		Write-Output $(Get-Date).ToString("F",$culture)
+		Write-Output "================================================================================"
+	}
+
+	# main ConvertTo-TradosLog function body
 	$culture = New-Object System.Globalization.CultureInfo("en-US")
 
-	[xml] $report = Get-Content (Resolve-Path -LiteralPath $Path)
-
-	# Only "analyse" report is supported
-	if ($report.task.name -ne "analyse") {return}
-
-	Write-Output "Start Analyse: $($report.task.taskInfo.runAt)"
-	Write-Output ""
-
-	# Temporarily redefine Output Field Separator to have possible multiple TM names nicely aligned
-	# e.g.:
-	# Translation Memory: foo.sdltm
-	#                     bar.sdltm
-	#                     foobar.sdltm
-	$tempOFS = $OFS
-	$OFS="`n                    "
-
-	Write-Output "Translation Memory: $($report.task.taskInfo.tm.name)"
-
-	# Restore original Output Field Separator
-	$OFS = $tempOFS
-
-	Write-Output ""
-
-	$filescount = 0
-	$report.task.file | ForEach {
-		$filescount++
-		if (!($TotalOnly)) {
-				Write-Output $_.name
-				Write-Output ""
-				Write-Output $(Write-LogItem $_)
-				Write-Output ""
+	Get-ChildItem $Path *.xml -File -Recurse:$Recurse | ForEach {
+		[xml] $report = Get-Content ($_.FullName)
+		# Only "analyse" report is supported
+		if ($report.task.name -ne "analyse") {
+			return
+		} else {
+			if ($Destination -ne $null -and $Destination -ne "") {
+				$OutputFile = $Destination
+			} else {
+				$OutputFile = ($_.Fullname -replace 'xml$','log')
+			}
+			Write-LogFile $report | Out-File -LiteralPath $OutputFile -Encoding UTF8 -Force
 		}
 	}
-
-	Write-Output "Analyse Total ($($filescount) files):"
-	Write-Output ""
-	Write-Output $(Write-LogItem $report.task.batchTotal)
-	Write-Output ""
-	Write-Output "Analyse finished successfully without errors!"
-	Write-Output ""
-	Write-Output $(Get-Date).ToString("F",$culture)
-	Write-Output "================================================================================"
 }
 
 function Export-TargetFiles {
@@ -501,7 +694,7 @@ files will be created in "D:\Export" folder.
 		[String] $ProjectLocation,
 
 		# Path to directory where the exported files will be placed.
-		# Complete directory structure present in that directory will be added as project source.
+		# If the directory does not exist, it will be created.
 		[Parameter (Mandatory = $true)]
 		[Alias("ExpLoc")]
 		[String] $ExportLocation,
@@ -521,15 +714,15 @@ files will be created in "D:\Export" folder.
 
 	# get project and its settings
 	$Project = Get-Project (Resolve-Path -LiteralPath $ProjectLocation).ProviderPath
-	$Settings = $Project.GetSettings()
+	$ProjectSettings = $Project.GetSettings()
 
 	# update the ExportLocation value in project settings
 	# (need to use this harakiri due to missing direct support for generic methods invocation in PowerShell)
-	$method = $Settings.GetType().GetMethod("GetSettingsGroup",[System.Type]::EmptyTypes)
+	$method = $ProjectSettings.GetType().GetMethod("GetSettingsGroup",[System.Type]::EmptyTypes)
 	$closedMethod = $method.MakeGenericMethod([Sdl.ProjectAutomation.Settings.ExportFilesSettings])
-	$closedMethod.Invoke($Settings,[System.Type]::EmptyTypes).ExportLocation.Value = $ExportLocation
+	$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).ExportLocation.Value = $ExportLocation
 	
-	$Project.UpdateSettings($Settings)
+	$Project.UpdateSettings($ProjectSettings)
 	$Project.Save()
 	
 	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
@@ -555,40 +748,127 @@ files will be created in "D:\Export" folder.
 	Validate-Task $Task
 }
 
-function Validate-Task {
-	param ([Sdl.ProjectAutomation.Core.AutomaticTask] $taskToValidate)
+function Update-MainTMs {
+<#
+.SYNOPSIS
+Updates main TMs of Trados Studio file based project.
+.DESCRIPTION
+Updates main TMs of Trados Studio file based project with content from the bilingual target language files.
+.EXAMPLE
+Update-MainTMs -ProjectLocation "D:\Project"
 
-	if ($taskToValidate.Status -eq [Sdl.ProjectAutomation.Core.TaskStatus]::Failed) {
-		Write-Host "Task"$taskToValidate.Name"failed."
-		ForEach($message in $taskToValidate.Messages) {
-			Write-Host $message.Message -ForegroundColor red
-		}
+Updates main TMs for all target languages defined in project located in "D:\Project" folder.
+.EXAMPLE
+Update-MainTMs -PrjLoc "D:\Project" -TrgLng "fi-FI,sv-SE"
+
+Updates main TMs for Finnish and Swedish languages from project located in "D:\Project" folder.
+#>
+	param (
+		# Path to directory where the project file is located.
+		[Parameter (Mandatory = $true)]
+		[Alias("Location","PrjLoc")]
+		[String] $ProjectLocation,
+
+		# Space- or comma- or semicolon-separated list of locale codes of project target languages.
+		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
+		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		[Alias("TrgLng")]
+		[String] $TargetLanguages
+	)
+
+	# get project and its settings
+	$Project = Get-Project (Resolve-Path -LiteralPath $ProjectLocation).ProviderPath
+	$ProjectSettings = $Project.GetSettings()
+
+	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
+		# Parse target languages from provided parameter
+		$TargetLanguagesList = $TargetLanguages -Split " |;|,"
 	}
-	if ($taskToValidate.Status -eq [Sdl.ProjectAutomation.Core.TaskStatus]::Invalid) {
-		Write-Host "Task"$taskToValidate.Name"not valid."
-		ForEach($message in $taskToValidate.Messages) {
-			Write-Host $message.Message -ForegroundColor red
-		}
+	else {
+		# Get project languages
+		$TargetLanguagesList = @($Project.GetProjectInfo().TargetLanguages.IsoAbbreviation)
 	}
-	if ($taskToValidate.Status -eq [Sdl.ProjectAutomation.Core.TaskStatus]::Rejected) {
-		Write-Host "Task"$taskToValidate.Name"rejected."
-		ForEach($message in $taskToValidate.Messages) {
-			Write-Host $message.Message -ForegroundColor red
-		}
+
+	Write-Host "`nUpdating main translation memories..." -ForegroundColor White
+
+	# get IDs of all target project files
+	[System.Guid[]] $TargetFilesGuids = @()
+	ForEach ($TargetLanguage in $TargetLanguagesList) {
+		$TargetFiles = $Project.GetTargetLanguageFiles($TargetLanguage)
+		$TargetFilesGuids += Get-Guids $TargetFiles
 	}
-	if ($taskToValidate.Status -eq [Sdl.ProjectAutomation.Core.TaskStatus]::Cancelled) {
-		Write-Host "Task"$taskToValidate.Name"cancelled."
-		ForEach($message in $taskToValidate.Messages) {
-			Write-Host $message.Message -ForegroundColor red
+	
+	# run (and then validate) the task sequence
+	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::UpdateMainTranslationMemories, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	Validate-Task $Task
+
+	Write-Host "Done"
+}
+
+function Get-BilingualFileMappings {
+	param (
+		[Sdl.Core.Globalization.Language[]] $LanguagesList,
+		[Sdl.ProjectAutomation.Core.ProjectFile[]] $TranslatableFilesList,
+		[String] $BilingualsPath
+	)
+
+	[Sdl.ProjectAutomation.Core.BilingualFileMapping[]] $mappings = @()
+	ForEach ($Language in $LanguagesList) {
+		Write-Host "Processing $Language" -ForegroundColor Yellow
+		$BilingualsCount = 0
+		$SearchPath = Join-Path -Path $BilingualsPath -ChildPath $Language.IsoAbbreviation
+		foreach ($file in $TranslatableFilesList) {
+			if ($file.Name.EndsWith(".sdlxliff")) {
+				$suffix = ""
+			}
+			else {
+				$suffix = ".sdlxliff"
+			}
+			$BilingualFile = $(Join-Path -Path $SearchPath -ChildPath $file.Folder | Join-Path -ChildPath $file.Name) + $suffix
+			if (Test-Path $BilingualFile) {
+				$mapping = New-Object Sdl.ProjectAutomation.Core.BilingualFileMapping
+				$mapping.BilingualFilePath = $BilingualFile
+				$mapping.Language = $Language
+				$mapping.FileId = $file.Id
+				$mappings += $mapping
+				$BilingualsCount += 1
+			}
 		}
+ 		Write-Host "  Assigned $BilingualsCount of $($TranslatableFilesList.Count) files"
 	}
+	return $mappings
+}
+
+function Validate-Task {
+	param (
+		[Sdl.ProjectAutomation.Core.AutomaticTask] $taskToValidate
+	)
+
 	if ($taskToValidate.Status -eq [Sdl.ProjectAutomation.Core.TaskStatus]::Completed) {
-		Write-Host "Task"$taskToValidate.Name"successfully completed." -ForegroundColor green
+		Write-Host "Task $($taskToValidate.Name) successfully completed." -ForegroundColor green
+	}
+	else {
+		switch ($taskToValidate.Status) {
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Failed).ToString() {Write-Host "Task $($taskToValidate.Name) failed." -ForegroundColor red}
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Invalid).ToString() {Write-Host "Task $($taskToValidate.Name) not valid." -ForegroundColor red}
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Rejected).ToString() {Write-Host "Task $($taskToValidate.Name) rejected." -ForegroundColor red}
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Cancelled).ToString() {Write-Host "Task $($taskToValidate.Name) cancelled." -ForegroundColor red}
+			Default {Write-Host "Task $($taskToValidate.Name) status:  $($taskToValidate.Status)" -ForegroundColor cyan}
+		}
+		ForEach ($message in $taskToValidate.Messages) {
+			if ($message.ProjectFileId -ne $null) {
+				$AffectedFile = @($Project.GetTargetLanguageFiles()).Where({$_.Id -eq $message.ProjectFileId})
+				Write-Host "$($AffectedFile.Language)`t$($AffectedFile.Folder)$($AffectedFile.Name)"
+			}
+			Write-Host "$($message.Message -Replace '(`n|`r)+$','')" -ForegroundColor red
+		}
 	}
 }
 
 function Validate-TaskSequence {
-	param ([Sdl.ProjectAutomation.FileBased.TaskSequence] $TaskSequenceToValidate)
+	param (
+		[Sdl.ProjectAutomation.FileBased.TaskSequence] $TaskSequenceToValidate
+	)
 
 	ForEach ($Task in $TaskSequenceToValidate.SubTasks) {
 		Validate-Task $Task
@@ -601,4 +881,6 @@ Export-ModuleMember Get-Project
 Export-ModuleMember Remove-Project
 Export-ModuleMember ConvertTo-TradosLog
 Export-ModuleMember Export-TargetFiles
+Export-ModuleMember Update-MainTMs
+Export-ModuleMember Get-BilingualFileMappings
 Export-ModuleMember Get-TaskFileInfoFiles
