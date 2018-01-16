@@ -311,7 +311,7 @@ Import-TMX -Path "D:\Projects\TMs\EN-DE.sdltm" -TMXPath "D:\TMX\English-German.t
 
 Imports "D:\TMX\English-German.tmx" file to "D:\Projects\TMs\EN-DE.sdltm" translation memory.
 .EXAMPLE
-Import-TMX -TMPath "EN-DE.sdltm" -TMXPath "English-German.tmx"
+Import-TMX -Path "EN-DE.sdltm" -TMXPath "English-German.tmx"
 
 Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both files are located in current folder.
 #>
@@ -365,11 +365,11 @@ Export-TMX
 
 Exports all Trados Studio translation memories found in current directory to TMX files. Existing TMX files will be preserved.
 .EXAMPLE
-Export-TMX -TMLoc "D:\Projects\TMs" -TMXLocation "D:\TMX_Exports" -Recurse -Force
+Export-TMX -TMLocation "D:\Projects\TMs" -TMXLocation "D:\TMX_Exports" -Recurse -Force
 
 Exports to TMX all Trados Studio TMs present in "D:\Projects\TMs" folder and its subfolders. Exported files will be stored to "D:\TMX_Exports" folder. Existing TMX files will be overwritten.
 .EXAMPLE
-Export-TMX -TMLoc "D:\Projects\TMs\EN-DE.sdltm"
+Export-TMX -TMLocation "D:\Projects\TMs\EN-DE.sdltm"
 
 Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Exported file will be stored in the same location as source file (i.e. "D:\Projects\TMs").
 #>
