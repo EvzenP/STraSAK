@@ -27,7 +27,7 @@ Creates translation packages for all target languages defined in project located
 packages will be created in "D:\Packages" folder;
 no project TMs, main TMs, termbases, etc. will be included in the packages.
 .EXAMPLE
-Export-Package -PrjLoc "D:\Project" -PkgLoc "D:\Packages" -TrgLng "fi-FI,sv-SE" -IncTM -IncTB
+Export-Package -ProjectLocation "D:\Project" -PackageLocation "D:\Packages" -TargetLanguages "fi-FI,sv-SE" -IncTM -IncTB
 
 Creates translation package for Finnish and Swedish target languages from project located in "D:\Project" folder;
 package will be created in "D:\Packages" folder;
@@ -213,7 +213,7 @@ Import-Package -ProjectLocation "D:\Project" -PackageLocation "D:\Packages"
 
 Imports all translation packages found in "D:\Packages" directory (and all its eventual subdirectories) into a project located in "D:\Project" folder.
 .EXAMPLE
-Import-Package -PrjLoc "D:\Project" -PkgLoc "D:\Packages\Handback_en-US_fi-FI.sdlrpx"
+Import-Package -ProjectLocation "D:\Project" -PackageLocation "D:\Packages\Handback_en-US_fi-FI.sdlrpx"
 
 Imports single  translation package from "D:\Packages\Handback_en-US_fi-FI.sdlrpx" folder  into a project located in "D:\Project" folder.
 #>
