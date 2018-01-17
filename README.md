@@ -16,6 +16,7 @@ And that's the purpose of this automation kit – to allow engineers to automate
 Command                 | Description
 ------------------------|------------
 **New-Project**         | Create new project – optionally based on project template or another project – in specified location, using specified source and target languages and TMs from specified location. Get source files from specified location and automatically convert them to translatable format and copy them to target languages. Optionally also pre-translate and analyze the files, saving results to Trados 2007-formatted log.
+**PseudoTranslate**     | Pseudo-translate specified project, using specified pseudo-translation options. Optionally also export the pseudo-translated target files.
 **Export-Package**      | Create translation packages from specified project, using specified package options, and save  them to specified location
 **Import-Package**      | Import return packages from specified location in a specified project
 **ConvertTo-TradosLog** | Convert Studio XML-based report to Trados 2007-formatted log. _Note:_ _This command_ _**operates on individual files only**__, not on entire directories._
@@ -134,5 +135,6 @@ This is PowerShell bug and there is currently no reasonable workaround... except
 
 You can vote for fixing this bug at following links:  
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/15976273-powershell-fails-to-start-if-path-contains-bracket
+
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
