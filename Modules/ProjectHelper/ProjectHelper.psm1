@@ -346,6 +346,8 @@ Analyze task is run after scanning, converting and copying to target languages.
 		Write-Host "Done"
 	}
 
+
+	# "safety save" before running automatic tasks, so that project is not completely lost in case of fatal crash
 	$Project.Save()
 
 	if ($Pretranslate -or $Analyze -or $PerfectMatch) {
@@ -682,7 +684,7 @@ Export-TargetFiles -ProjectLocation "D:\Project" -ExportLocation "D:\Export"
 Exports target files for all target languages defined in project located in "D:\Project" folder;
 files will be created in "D:\Export" folder.
 .EXAMPLE
-Export-TargetFiles -PrjLoc "D:\Project" -ExpLoc "D:\Export" -TrgLng "fi-FI,sv-SE"
+Export-TargetFiles -ProjectLocation "D:\Project" -ExportLocation "D:\Export" -TargetLanguages "fi-FI,sv-SE"
 
 Exports target files for Finnish and Swedish languages from project located in "D:\Project" folder;
 files will be created in "D:\Export" folder.
@@ -759,7 +761,7 @@ Update-MainTMs -ProjectLocation "D:\Project"
 
 Updates main TMs for all target languages defined in project located in "D:\Project" folder.
 .EXAMPLE
-Update-MainTMs -PrjLoc "D:\Project" -TrgLng "fi-FI,sv-SE"
+Update-MainTMs -ProjectLocation "D:\Project" -TargetLanguages "fi-FI,sv-SE"
 
 Updates main TMs for Finnish and Swedish languages from project located in "D:\Project" folder.
 #>
@@ -802,6 +804,148 @@ Updates main TMs for Finnish and Swedish languages from project located in "D:\P
 	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::UpdateMainTranslationMemories, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
 	Validate-Task $Task
 
+	Write-Host "Done"
+}
+
+function PseudoTranslate {
+<#
+.SYNOPSIS
+Pseudo-translates Trados Studio project.
+.DESCRIPTION
+Pseudo-translates Trados Studio project, allowing to define specific pseudo-translation options.
+Optionally also exports the pseudo-translated target files.
+.EXAMPLE
+PseudoTranslate -ProjectLocation "D:\Project"
+
+Pseudo-translates all target languages defined in project located in "D:\Project" folder.
+.EXAMPLE
+PseudoTranslate -ProjectLocation "D:\Project" -TargetLanguages "fi-FI,sv-SE"
+
+Pseudo-translates Finnish and Swedish languages from project located in "D:\Project" folder.
+.EXAMPLE
+Export-Package -PrjLoc "D:\Project" -TrgLng "fi-FI,sv-SE" -ExpLoc "D:\Export"
+
+Pseudo-translates Finnish and Swedish languages from project located in "D:\Project" folder and exports the pseudo-translated files to "D:\Export" folder.
+#>
+	param (
+		# Path to directory where the project file is located.
+		[Parameter (Mandatory = $true)]
+		[Alias("Location","PrjLoc")]
+		[String] $ProjectLocation,
+
+		# Space- or comma- or semicolon-separated list of locale codes of project target languages.
+		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
+		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		[Alias("TrgLng")]
+		[String] $TargetLanguages,
+
+		# Generate the same translations every time pseudo-translate is run. Otherwise, random words will be used.
+		[Alias("Determ","Det")]
+		[Switch] $Deterministic,
+
+		# String that will be appended to the start of each pseudo-translation.
+		[Alias("Start")]
+		[String] $AppendStart = "_",
+
+		# String that will be appended to the end of each pseudo-translation.
+		[Alias("End")]
+		[String] $AppendEnd = "_",
+
+		# AppendStart and AppendEnd strings are applied at paragraph level. Otherwise they are applied at segment level.
+		[Alias("Paragraph","Par")]
+		[Switch] $AppendToParagraph,
+
+		# The factor by which the length of pseudo-translated content will differ to the source content.
+		[ValidateRange(0,5.9)]
+		[Alias("Expand","Exp")]
+		[Double] $ExpandBy = 1.3,
+
+		# Use dollar signs to represent characters in the pseudo-translations.
+		[Switch] $Dollar,
+
+		# Path to directory where to export pseudo-translated files.
+		# If the directory does not exist, it will be created.
+		[Alias("ExpLoc","Export")]
+		[String] $ExportLocation
+
+	)
+
+	# get project and its settings
+	$Project = Get-Project (Resolve-Path -LiteralPath $ProjectLocation).ProviderPath
+	$ProjectSettings = $Project.GetSettings()
+
+	$method = $ProjectSettings.GetType().GetMethod("GetSettingsGroup",[System.Type]::EmptyTypes)
+	$closedMethod = $method.MakeGenericMethod([Sdl.ProjectAutomation.Settings.PseudoTranslateSettings])
+	
+	if ($Deterministic) {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).DeterministicPseudoTranslation.Value = $true
+	} else {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).DeterministicPseudoTranslation.Value = $false
+	}
+
+	if ($AppendStart -eq $null -or $AppendStart -eq "") {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendStart.Value = $false
+	} else {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendStart.Value = $true
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendStartString.Value = $AppendStart
+	}
+
+	if ($AppendEnd -eq $null -or $AppendEnd -eq "") {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendEnd.Value = $false
+	} else {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendEnd.Value = $true
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendEndString.Value = $AppendEnd
+	}
+
+	if ($AppendToParagraph) {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendToUnit.Value = [Sdl.ProjectAutomation.Settings.AppendToUnitType]::Paragraph
+	} else {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).AppendToUnit.Value = [Sdl.ProjectAutomation.Settings.AppendToUnitType]::Segment
+	}
+
+	if ($ExpandBy -ne $null) {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).ExpansionLimit.Value = $ExpandBy
+	}
+
+	if ($Dollar) {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).UseDictionary.Value = $false
+	} else {
+		$closedMethod.Invoke($ProjectSettings,[System.Type]::EmptyTypes).UseDictionary.Value = $true
+	}
+
+	$Project.UpdateSettings($ProjectSettings)
+
+	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
+		# Parse target languages from provided parameter
+		$TargetLanguagesList = $TargetLanguages -Split " |;|,"
+	}
+	else {
+		# Get project languages
+		$TargetLanguagesList = @($Project.GetProjectInfo().TargetLanguages.IsoAbbreviation)
+	}
+
+	Write-Host "`nPseudo-translating..." -ForegroundColor White
+
+	# get IDs of all target project files
+	[System.Guid[]] $TargetFilesGuids = @()
+	ForEach ($TargetLanguage in $TargetLanguagesList) {
+		$TargetFiles = $Project.GetTargetLanguageFiles($TargetLanguage)
+		$TargetFilesGuids += Get-Guids $TargetFiles
+	}
+	
+	# run (and then validate) the task sequence
+	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PseudoTranslateFiles, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	Validate-Task $Task
+
+	Write-Host "Done"
+
+	if ($ExportLocation) {
+		Export-TargetFiles -ProjectLocation $ProjectLocation -ExportLocation $ExportLocation -TargetLanguages $TargetLanguages
+	}
+
+	# Save the project
+	Write-Host "`nSaving project..." -ForegroundColor White
+	$Project.Save()
 	Write-Host "Done"
 }
 
@@ -875,12 +1019,13 @@ function Validate-TaskSequence {
 	}
 }
 
-
+Set-Alias -Name Pseudo -Value PseudoTranslate
 Export-ModuleMember New-Project
 Export-ModuleMember Get-Project
 Export-ModuleMember Remove-Project
 Export-ModuleMember ConvertTo-TradosLog
 Export-ModuleMember Export-TargetFiles
 Export-ModuleMember Update-MainTMs
+Export-ModuleMember PseudoTranslate -Alias Pseudo
 Export-ModuleMember Get-BilingualFileMappings
 Export-ModuleMember Get-TaskFileInfoFiles
