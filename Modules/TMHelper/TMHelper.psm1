@@ -342,16 +342,16 @@ Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both file
 	$Path = (Resolve-Path -LiteralPath $Path).ProviderPath
 	$TMXPath = (Resolve-Path -LiteralPath $TMXPath).ProviderPath
 	
-	$TM = Get-FilebasedTM $Path
-	
 	Write-Host "$(Split-Path $TMXPath -Leaf) -> $(Split-Path $Path -Leaf)" -ForegroundColor White
 	
+	$TM = Get-FilebasedTM $Path
 	$Importer = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryImporter ($TM.LanguageDirection)
 	$Importer.Add_BatchImported($OnBatchImported)
 	$Importer.Import($TMXPath)
+	$Importer.Remove_BatchImported($OnBatchImported)
+	
 	# when all is done, output nothing WITH NEW LINE
 	Write-Host $null
-	$Importer.Remove_BatchImported($OnBatchImported)
 }
 
 function Export-TMX {
@@ -407,23 +407,27 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 		Write-Host "TUs processed: $TotalProcessed, exported: $TotalExported`r" -NoNewLine
 	}
 	
-	Get-ChildItem $TMLocation *.sdltm -File -Recurse:$Recurse | ForEach {
-		$TMXName = $_.Name.Replace(".sdltm", ".tmx")
-		Write-Host "$($_.Name) -> $TMXName" -ForegroundColor White
-		$TM = Get-FilebasedTM $_.FullName
+	Get-ChildItem $TMLocation *.sdltm -File -Recurse:$Recurse | ForEach-Object {
+		$SDLTM = $_
+		$TMXName = $SDLTM.Name.Replace(".sdltm", ".tmx")
+		
 		if ($TMXLocation -eq "") {
-			$TMXPath = $_.DirectoryName
+			$TMXPath = $SDLTM.DirectoryName
 		}
 		else {
 			$TMXPath = $TMXLocation
 		}
+		
+		Write-Host "$($SDLTM.Name) -> $TMXName" -ForegroundColor White
+		
+		$TM = Get-FilebasedTM $SDLTM.FullName
 		$Exporter = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryExporter ($TM.LanguageDirection)
 		$Exporter.Add_BatchExported($OnBatchExported)
 		$Exporter.Export("$TMXPath\$TMXName", ($Force.IsPresent))
-		# when all is done, output nothing WITH NEW LINE
-		Write-Host $null
 		$Exporter.Remove_BatchExported($OnBatchExported)
 		
+		# when all is done, output nothing WITH NEW LINE
+		Write-Host $null
 	}
 }
 
