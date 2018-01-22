@@ -83,11 +83,11 @@ project TM will not be included in package, main TM and termbase will be include
 
 		# Recompute wordcount and analysis to update cross-file repetition counts
 		# and include the recomputed reports in package
-		[Alias("RecAna","RecomputeAnalyse","RecomputeAnalyze")]
+		[Alias("RecAna","Recompute","RecomputeAnalyse","RecomputeAnalyze")]
 		[Switch] $RecomputeAnalysis,
 
 		# Include existing wordcount reports in package
-		[Alias("IncRep","IncludeExistingReport","IncludeReports","IncludeReport")]
+		[Alias("IncRep", "IncludeExisting","IncludeExistingReport","IncludeReports","IncludeReport")]
 		[Switch] $IncludeExistingReports,
 
 		# Keep automated translation providers information in package
@@ -114,7 +114,7 @@ project TM will not be included in package, main TM and termbase will be include
 	if ($ProjectTM -eq "CreateNew") {
 		# if the IncludeReports property exists, set it to true
 		# (this property was introduced only in Studio 2015 SR2 CU7)
-		if ($PackageOptions.IncludeReports) {
+		if (Get-Member -InputObject $PackageOptions -Name "IncludeReports" -MemberType Properties) {
 			$PackageOptions.IncludeReports = $true
 		}
 	}
@@ -138,12 +138,12 @@ project TM will not be included in package, main TM and termbase will be include
 	if ($IncludeExistingReports) {
 		# if the IncludeExistingReports property exists, set it to true
 		# (this property was introduced only in Studio 2015 SR2 CU7)
-		if ($PackageOptions.IncludeExistingReports) {
+		if (Get-Member -InputObject $PackageOptions -Name "IncludeExistingReports" -MemberType Properties) {
 			$PackageOptions.IncludeExistingReports = $true
 		}
 		# if the IncludeReports property exists, set it to true
 		# (this property was introduced only in Studio 2015 SR2 CU7)
-		if ($PackageOptions.IncludeReports) {
+		if (Get-Member -InputObject $PackageOptions -Name "IncludeReports" -MemberType Properties) {
 			$PackageOptions.IncludeReports = $true
 		}
 	}
@@ -151,11 +151,11 @@ project TM will not be included in package, main TM and termbase will be include
 		$PackageOptions.RecomputeAnalysisStatistics = $true
 		# if the IncludeReports property exists, set it to true
 		# (this property was introduced only in Studio 2015 SR2 CU7)
-		if ($PackageOptions.IncludeReports) {
+		if (Get-Member -InputObject $PackageOptions -Name "IncludeReports" -MemberType Properties) {
 			$PackageOptions.IncludeReports = $true
 		}
 	}
-
+	
 	# According to info from SDL developer forum, using [DateTime]::MaxValue sets "no package due date"
 	$PackageDueDate = [DateTime]::MaxValue
 
@@ -179,9 +179,9 @@ project TM will not be included in package, main TM and termbase will be include
 		$User = "$($Language.IsoAbbreviation) translator"
 		# Set package name to project name with target language ISO code suffix
 		$PackageName = "$($Project.GetProjectInfo().Name)_$($Language.IsoAbbreviation)"
-
+		
 		Write-Host "$PackageName$ProjectPackageExtension"
-
+		
 		# Get TaskFileInfo (files list) data for the target language's project files
 		[Sdl.ProjectAutomation.Core.TaskFileInfo[]] $TaskFiles = Get-TaskFileInfoFiles $Project $Language
 		# Create the manual task which will be associated with files being included in the package
