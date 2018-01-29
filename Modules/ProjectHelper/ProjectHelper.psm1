@@ -698,7 +698,7 @@ files will be created in "D:\Export" folder.
 		# Path to directory where the exported files will be placed.
 		# If the directory does not exist, it will be created.
 		[Parameter (Mandatory = $true)]
-		[Alias("ExpLoc")]
+		[Alias("ExpLoc","Export")]
 		[String] $ExportLocation,
 
 		# Space- or comma- or semicolon-separated list of locale codes of project target languages.
@@ -993,11 +993,21 @@ function Validate-Task {
 	}
 	else {
 		switch ($taskToValidate.Status) {
-			([Sdl.ProjectAutomation.Core.TaskStatus]::Failed).ToString() {Write-Host "Task $($taskToValidate.Name) failed." -ForegroundColor red}
-			([Sdl.ProjectAutomation.Core.TaskStatus]::Invalid).ToString() {Write-Host "Task $($taskToValidate.Name) not valid." -ForegroundColor red}
-			([Sdl.ProjectAutomation.Core.TaskStatus]::Rejected).ToString() {Write-Host "Task $($taskToValidate.Name) rejected." -ForegroundColor red}
-			([Sdl.ProjectAutomation.Core.TaskStatus]::Cancelled).ToString() {Write-Host "Task $($taskToValidate.Name) cancelled." -ForegroundColor red}
-			Default {Write-Host "Task $($taskToValidate.Name) status:  $($taskToValidate.Status)" -ForegroundColor cyan}
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Failed).ToString() {
+				Write-Host "Task $($taskToValidate.Name) failed." -ForegroundColor red
+			}
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Invalid).ToString() {
+				Write-Host "Task $($taskToValidate.Name) not valid." -ForegroundColor red
+			}
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Rejected).ToString() {
+				Write-Host "Task $($taskToValidate.Name) rejected." -ForegroundColor red
+			}
+			([Sdl.ProjectAutomation.Core.TaskStatus]::Cancelled).ToString() {
+				Write-Host "Task $($taskToValidate.Name) cancelled." -ForegroundColor red
+			}
+			Default {
+				Write-Host "Task $($taskToValidate.Name) status:  $($taskToValidate.Status)" -ForegroundColor cyan
+			}
 		}
 		ForEach ($message in $taskToValidate.Messages) {
 			if ($message.ProjectFileId -ne $null) {
