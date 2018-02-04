@@ -88,16 +88,14 @@ Analyze task is run after scanning, converting and copying to target languages.
 		[Parameter (Mandatory = $true)]
 		[Alias("SrcLoc")]
 		[String] $SourceLocation,
-
-		# Locale code of project source language.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		
+		# Project source language locale code.
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		[Alias("SrcLng")]
 		[String] $SourceLanguage,
-
-		# Space- or comma- or semicolon-separated list of locale codes of project target languages.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		
+		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		[Alias("TrgLng")]
 		[String] $TargetLanguages,
 
@@ -293,8 +291,8 @@ Analyze task is run after scanning, converting and copying to target languages.
 						
 						# construct the log file name (without extension, which is dependent on log save format)
 						$ReportTargetLanguage = $ReportCulture.Name
-						$ReportName = ($R.Name -replace 'Report','')
-						$LogFileName = "$ReportName$SourceLanguage_$ReportTargetLanguage"
+						$ReportName = ($R.Name -replace 'Report','')  # "Analyze Files Report" => "Analyze Files "
+						$LogFileName = "$ReportName$($SourceLanguage)_$ReportTargetLanguage"
 						
 						# If log location does not exist, create it
 						if (!(Test-Path -LiteralPath $LogLocation)) {
@@ -700,10 +698,9 @@ files will be created in "D:\Export" folder.
 		[Parameter (Mandatory = $true)]
 		[Alias("ExpLoc","Export")]
 		[String] $ExportLocation,
-
-		# Space- or comma- or semicolon-separated list of locale codes of project target languages.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		
+		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		[Alias("TrgLng")]
 		[String] $TargetLanguages
 	)
@@ -770,10 +767,9 @@ Updates main TMs for Finnish and Swedish languages from project located in "D:\P
 		[Parameter (Mandatory = $true)]
 		[Alias("Location","PrjLoc")]
 		[String] $ProjectLocation,
-
-		# Space- or comma- or semicolon-separated list of locale codes of project target languages.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		
+		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		[Alias("TrgLng")]
 		[String] $TargetLanguages
 	)
@@ -832,10 +828,9 @@ Pseudo-translates Finnish and Swedish languages from project located in "D:\Proj
 		[Parameter (Mandatory = $true)]
 		[Alias("Location","PrjLoc")]
 		[String] $ProjectLocation,
-
-		# Space- or comma- or semicolon-separated list of locale codes of project target languages.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		
+		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		[Alias("TrgLng")]
 		[String] $TargetLanguages,
 

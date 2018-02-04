@@ -51,15 +51,13 @@ Creates "D:\Projects\TMs\Contoso_English-German_Main.sdltm" translation memory w
 #		[String] $From,
 
 		# Locale code of translation memory source language.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		[Parameter (Mandatory = $true)]
 		[Alias("SrcLng")]
 		[String] $SourceLanguage,
-
+		
 		# Locale code of translation memory target language.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		[Parameter (Mandatory = $true)]
 		[Alias("TrgLng")]
 		[String] $TargetLanguage,
@@ -187,8 +185,8 @@ function Get-Language {
 	param(
 		[String] $Language
 	)
-
-	# temporary object used to get properly cased language code
+	
+	# temporary object used to get properly lower-/uppercased language code
 	$tmp = New-Object Sdl.Core.Globalization.Language ($Language)
 
 	# use the temporary object's language code to create actual language object

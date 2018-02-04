@@ -45,10 +45,9 @@ project TM will not be included in package, main TM and termbase will be include
 		[Parameter (Mandatory = $true)]
 		[Alias("PkgLoc")]
 		[String] $PackageLocation,
-
-		# Space- or comma- or semicolon-separated list of locale codes of project target languages for which the package will be created.
-		# See (incomplete) list of codes at https://www.microsoft.com/resources/msdn/goglobal/
-		# Hint: Code for Latin American Spanish is "es-419" ;-)
+		
+		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
+		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
 		# If this parameter is omitted, packages for all project target languages are created.
 		[Alias("TrgLng")]
 		[String] $TargetLanguages,
