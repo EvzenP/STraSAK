@@ -19,9 +19,9 @@ Command                 | Description
 **PseudoTranslate**     | Pseudo-translate specified project, using specified pseudo-translation options. Optionally also export the pseudo-translated target files.
 **Export-Package**      | Create translation packages from specified project, using specified package options, and save  them to specified location
 **Import-Package**      | Import return packages from specified location in a specified project
-**ConvertTo-TradosLog** | Convert Studio XML-based report to Trados 2007-formatted log. _Note:_ _This command_ _**operates on individual files only**__, not on entire directories._
+**ConvertTo-TradosLog** | Convert Studio XML-based report to Trados 2007-formatted log
 **Export-TargetFiles**  | Export target files from specified project to specified location
-**Update-MainTMs**       | Update main translation memories of specified project
+**Update-MainTMs**      | Update main translation memories of specified project
 **New-FileBasedTM**     | Create new translation memory in specified location, using specified options
 **Export-TMX**          | Export one or more Trados Studio translation memories to TMX
 **Import-TMX**          | Import content from TMX file in a specified TM
@@ -41,11 +41,11 @@ The kit consists of:
 _This may be required only for Windows 7 and 8._
 _**Windows 8.1 has PowerShell 4.0 already built-in, Windows 10 has PowerShell 5.0 already built-in.**_
 
-1.	**Create `WindowsPowerShell` subfolder** in your `Documents` folder  
+1. **Create `WindowsPowerShell` subfolder** in your `Documents` folder  
 (i.e. the result will be `C:\Users\<YourProfile>\Documents\WindowsPowerShell`)  
 **NOTE**: If you moved your Documents folder to another location, create the subfolder in that location.
-2.	**Copy the entire `Modules` folder** (including the folder structure) into the created `WindowsPowerShell` folder.
-3.	**Put the `TS2015.cmd` wrapper script** to any preferred location and **add the location to your PATH environment variable**, so that you can run the script without specifying its full path.  
+2. **Copy the entire `Modules` folder** (including the folder structure) into the created `WindowsPowerShell` folder.
+3. **Put the `TS2015.cmd` wrapper script** to any preferred location and **add the location to your PATH environment variable**, so that you can run the script without specifying its full path.  
 See https://www.java.com/en/download/help/path.xml for more information about PATH variable and how to edit its content in different operating systems.  
 _(Optionally you can put the script to a location which is already listed in the PATH variable... but that may be uncomfortable, depeding on particular system setup, etc.)_
 
@@ -138,3 +138,44 @@ https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/1597627
 
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
+## Version history
+### STraSAK v1.3 &nbsp; &nbsp; &nbsp; (2018-02-04)
+* **New-Project**: fixed v1.2 bug causing source language code missing in created Trados log file names *(e.g. `Analyze Files de-DE.log` instead of  `Analyze Files en-US_de-DE.log`)*
+
+### STraSAK v1.2 &nbsp; &nbsp; &nbsp; (2018-01-29)
+* **Export-Package**: fixed bug causing Project TM (and analysis report) not being included in created translation package when "Create new project TM" option was used
++ **Export-Package**: added `Recompute` and `IncludeExisting` aliases for `RecomputeAnalysis` and `IncludeExistingReports` parameters
++ **Export-TargetFiles**: added `Export` alias for `ExportLocation` parameter, to be consistent with pseudotranslation parameters
+
+### STraSAK v1.1 &nbsp; &nbsp; &nbsp; (2018-01-17)
++ Added **PseudoTranslate** command
+
+### STraSAK v1.0 FINAL &nbsp; &nbsp; &nbsp; (2017-12-29)
++ added **New-Project** command features:
+    * can also apply PerfectMatch during project creation (with automatic matching of bilingual files)
+    * can also save analysis logs to Excel format
+    * can run in special "per-language mode" when tasks (pretranslation, analysis, etc.) are run separately for each language – see more info in manual
++ added/changed **ConvertTo-TradosLog** command features:
+    * can now **convert all logs in folder** (incl. subfolders, if needed)
+    * can now **specify output file name and location** when converting single file
++ new **Update-MainTMs** command which does exactly what it says ;-)
++ new **New-FileBasedTM** command for quick creation of empty TMs
++ new **Import-TMX** command for quick TMX import to TM
++ new **Export-TMX** command for quick TMX export
+    * can export all TMs in folder, incl. subfolders if needed
+* changed **Import-Package** command feature
+    * now does not search input folder recursively by default
+    * separate `-Recurse` switch added to search for packages also in subfolders
+* improved progress messages
+
+### STraSAK v1.0 beta hotfix 1 &nbsp; &nbsp; &nbsp; (2016-12-02)
+* internal fuzzies now correctly included in Trados 2007 textual logs
+
+### STraSAK v1.0 beta &nbsp; &nbsp; &nbsp; (2016-11-21)
+* Studio project creation, including pre-translation, analysis and textual logs export
++ translation packages creation
++ return packages import
++ target files export
+
+### STraSAK Technical Preview &nbsp; &nbsp; &nbsp; (2016-10-10)
+Basic project creation functionality
