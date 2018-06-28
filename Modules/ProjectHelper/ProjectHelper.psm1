@@ -14,10 +14,11 @@ Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.Projec
 # Due to API bug basing new projects on "Default.sdltpl" template instead of actual default project template,
 # we need to find the real default template configured in Trados Studio by reading the configuration files
 switch ($StudioVersion) {
-	"Studio2" {$StudioVersionAppData = "10.0.0.0"}
-	"Studio3" {$StudioVersionAppData = "11.0.0.0"}
-	"Studio4" {$StudioVersionAppData = "12.0.0.0"}
-	"Studio5" {$StudioVersionAppData = "14.0.0.0"}
+	"Studio2"  {$StudioVersionAppData = "10.0.0.0"}
+	"Studio3"  {$StudioVersionAppData = "11.0.0.0"}
+	"Studio4"  {$StudioVersionAppData = "12.0.0.0"}
+	"Studio5"  {$StudioVersionAppData = "14.0.0.0"}
+	"Studio15" {$StudioVersionAppData = "15.0.0.0"}
 }
 # Get default project template GUID from the user settings file
 $DefaultProjectTemplateGuid = (Select-Xml -Path "${Env:AppData}\SDL\SDL Trados Studio\$StudioVersionAppData\UserSettings.xml" -XPath "//Setting[@Id='DefaultProjectTemplateGuid']").Node.InnerText

@@ -55,10 +55,10 @@ That's all... the kit is now ready for use!
 ## Usage
 ### In Windows batch script
 Call the wrapper script with desired action command and its parameters as command line arguments:  
-`call TS2015 New-Project -Name "My project" -Location "D:\My project" ...`
+`call TS2017 New-Project -Name "My project" -Location "D:\My project" ...`
 
 If the wrapper script's location is not listed in PATH environment variable, you need to use full path to script:  
-`call "C:\My scripts\TS2015.cmd" New-Project -Name "My project" -Location "D:\My project" ...`
+`call "C:\My scripts\TS2017.cmd" New-Project -Name "My project" -Location "D:\My project" ...`
 
 ### In Powershell script
 Call the desired PowerShell function with corresponding parameters directly from your PowerShell script:  
@@ -78,7 +78,7 @@ Target languages list for "CreateProject", "ExportPackages" and "ExportFiles" sc
 @echo off
 set TARGETLANGUAGES=%~1
 for %%D in ("%CD%") do set "PROJECTNAME=%%~nxD"
-call TS2015 New-Project ^
+call TS2017 New-Project ^
      -Name "%PROJECTNAME%" ^
      -SourceLocation "02_Prep" ^
      -ProjectLocation "03_Studio" ^
@@ -92,7 +92,7 @@ call TS2015 New-Project ^
 ```
 @echo off
 set TARGETLANGUAGES=%~1
-call TS2015 Export-Package ^
+call TS2017 Export-Package ^
      -ProjectLocation "03_Studio" ^
      -PackageLocation "04_ForTrans" ^
      -TargetLanguages "%TARGETLANGUAGES%" ^
@@ -101,7 +101,7 @@ call TS2015 Export-Package ^
 ==05_ImportPackages.cmd==:
 ```
 @echo off
-call TS2015 Import-Package ^
+call TS2017 Import-Package ^
      -ProjectLocation "03_Studio" ^
      -PackageLocation "05_FromTrans"
 ```
@@ -109,7 +109,7 @@ call TS2015 Import-Package ^
 ```
 @echo off
 set TARGETLANGUAGES=%~1
-call TS2015 Export-TargetFiles ^
+call TS2017 Export-TargetFiles ^
      -ProjectLocation "03_Studio" ^
      -ExportLocation "06_Post" ^
      -TargetLanguages "%TARGETLANGUAGES%"
@@ -139,6 +139,9 @@ https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/1597627
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
 ## Version history
+### STraSAK v1.4 &nbsp; &nbsp; &nbsp; (2018-06-29)
+* Added support for Studio 2019
+
 ### STraSAK v1.3 &nbsp; &nbsp; &nbsp; (2018-02-04)
 * **New-Project**: fixed v1.2 bug causing source language code missing in created Trados log file names *(e.g. `Analyze Files de-DE.log` instead of  `Analyze Files en-US_de-DE.log`)*
 
