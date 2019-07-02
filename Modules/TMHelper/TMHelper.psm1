@@ -51,13 +51,13 @@ Creates "D:\Projects\TMs\Contoso_English-German_Main.sdltm" translation memory w
 #		[String] $From,
 
 		# Locale code of translation memory source language.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Parameter (Mandatory = $true)]
 		[Alias("SrcLng")]
 		[String] $SourceLanguage,
 		
 		# Locale code of translation memory target language.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Parameter (Mandatory = $true)]
 		[Alias("TrgLng")]
 		[String] $TargetLanguage,

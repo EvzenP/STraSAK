@@ -49,7 +49,7 @@ project TM will not be included in package, main TM and termbase will be include
 		[String] $PackageLocation,
 		
 		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		# If this parameter is omitted, packages for all project target languages are created.
 		[Alias("TrgLng")]
 		[String] $TargetLanguages,

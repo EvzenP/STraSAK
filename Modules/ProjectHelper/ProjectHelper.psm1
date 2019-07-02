@@ -93,12 +93,12 @@ Analyze task is run after scanning, converting and copying to target languages.
 		[String] $SourceLocation,
 		
 		# Project source language locale code.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Alias("SrcLng")]
 		[String] $SourceLanguage,
 		
 		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Alias("TrgLng")]
 		[String] $TargetLanguages,
 
@@ -704,7 +704,7 @@ files will be created in "D:\Export" folder.
 		[String] $ExportLocation,
 		
 		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Alias("TrgLng")]
 		[String] $TargetLanguages
 	)
@@ -773,7 +773,7 @@ Updates main TMs for Finnish and Swedish languages from project located in "D:\P
 		[String] $ProjectLocation,
 		
 		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Alias("TrgLng")]
 		[String] $TargetLanguages
 	)
@@ -834,7 +834,7 @@ Pseudo-translates Finnish and Swedish languages from project located in "D:\Proj
 		[String] $ProjectLocation,
 		
 		# Space-, comma- or semicolon-separated list of locale codes of project target languages.
-		# For locale codes, see https://www.microsoft.com/resources/msdn/goglobal/
+		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Alias("TrgLng")]
 		[String] $TargetLanguages,
 
