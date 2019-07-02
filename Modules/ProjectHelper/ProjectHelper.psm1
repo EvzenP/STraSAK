@@ -28,6 +28,8 @@ $LocalDataFolder = (Select-Xml -Path "${Env:AppData}\SDL\ProjectApi\$StudioVersi
 $DefaultProjectTemplate = (Select-Xml -Path "$LocalDataFolder\projects.xml" -XPath "//ProjectTemplateListItem[@Guid='$DefaultProjectTemplateGuid']/@ProjectTemplateFilePath").Node.Value
 ##########################################################################################################
 
+$LanguagesSeparator = "\s+|;\s*|,\s*"
+
 function New-Project {
 <#
 .SYNOPSIS
@@ -190,7 +192,7 @@ Analyze task is run after scanning, converting and copying to target languages.
 	}
 	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
 		# Parse target languages into array
-		$TargetLanguagesList = $TargetLanguages -Split " |;|,"
+		$TargetLanguagesList = $TargetLanguages -Split $LanguagesSeparator
 		$ProjectInfo.TargetLanguages = Get-Languages $TargetLanguagesList
 	}
 
@@ -284,7 +286,8 @@ Analyze task is run after scanning, converting and copying to target languages.
 						# all custom cultures share the same LCID 4096
 						# and since the only other available info in the report is the language name, we have to find the name in list of all custom cultures
 						if ($LCID -eq 4096) {
-							$ReportCulture = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::UserCustomCulture) | Where-Object -Property EnglishName -eq $TempReport.task.taskInfo.language.name
+							$CustomCulturesList = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::UserCustomCulture)
+							$ReportCulture = $CustomCulturesList | Where-Object -Property EnglishName -eq $TempReport.task.taskInfo.language.name
 						}
 						else {
 							$ReportCulture = New-Object System.Globalization.CultureInfo($LCID)
@@ -727,7 +730,7 @@ files will be created in "D:\Export" folder.
 	
 	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
 		# Parse target languages from provided parameter
-		$TargetLanguagesList = $TargetLanguages -Split " |;|,"
+		$TargetLanguagesList = $TargetLanguages -Split $LanguagesSeparator
 	}
 	else {
 		# Get project languages
@@ -781,7 +784,7 @@ Updates main TMs for Finnish and Swedish languages from project located in "D:\P
 
 	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
 		# Parse target languages from provided parameter
-		$TargetLanguagesList = $TargetLanguages -Split " |;|,"
+		$TargetLanguagesList = $TargetLanguages -Split $LanguagesSeparator
 	}
 	else {
 		# Get project languages
@@ -913,7 +916,7 @@ Pseudo-translates Finnish and Swedish languages from project located in "D:\Proj
 
 	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
 		# Parse target languages from provided parameter
-		$TargetLanguagesList = $TargetLanguages -Split " |;|,"
+		$TargetLanguagesList = $TargetLanguages -Split $LanguagesSeparator
 	}
 	else {
 		# Get project languages

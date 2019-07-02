@@ -10,6 +10,8 @@ else {
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.FileBased.dll"
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.Core.dll"
 
+$LanguagesSeparator = "\s+|;\s*|,\s*"
+
 $ProjectPackageExtension = ".sdlppx"
 $ReturnPackageExtension = ".sdlrpx"
 
@@ -162,7 +164,7 @@ project TM will not be included in package, main TM and termbase will be include
 
 	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
 		# Parse target languages from provided parameter
-		$TargetLanguagesList = $TargetLanguages -Split " |;|,"
+		$TargetLanguagesList = $TargetLanguages -Split $LanguagesSeparator
 	}
 	else {
 		# Get project languages
