@@ -139,6 +139,9 @@ https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/1597627
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
 ## Version history
+### STraSAK v1.5 &nbsp; &nbsp; &nbsp; (2019-07-03)
+* **New-FileBasedTM** command can now create multiple TMs at once
+
 ### STraSAK v1.4 &nbsp; &nbsp; &nbsp; (2018-06-29)
 * Added support for Studio 2019
 
