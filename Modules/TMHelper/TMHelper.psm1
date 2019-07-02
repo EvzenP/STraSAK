@@ -10,21 +10,40 @@ else {
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.LanguagePlatform.TranslationMemoryApi.dll"
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.LanguagePlatform.TranslationMemory.dll"
 
+$LanguagesSeparator = "\s+|;\s*|,\s*"
+
+$TMFileExtension = ".sdltm"
+
 function New-FileBasedTM {
 <#
 .SYNOPSIS
 Creates a new file based TM.
 .DESCRIPTION
-Creates new file based translation memory using specified source and target language.
+Creates new file based translation memory using specified source language and target language(s).
 Optionally also a TM description and further TM behavior options can be specified.
+TM can be created
+– using specified name and location
+ (where the name will be used for the internal TM 'display name' and for filename of the created *.sdltm file)
+– using specified full file path
+ (where the *.sdltm file name will be used for the internal TM 'display name')
+If using only single target language, the specified TM name or .sdltm filename is used as-is.
+If using multiple target languages, the source- and target language ISO abbreviations are added as suffix to the specified TM name or .sdltm filename.
 .EXAMPLE
-New-FileBasedTM -Name "Contoso English-German Main" -TMLocation "D:\Projects\TMs" -SourceLanguage "en-US" -TargetLanguage "de-DE"
+New-FileBasedTM -Name "Contoso English-German Main" -TMLocation "D:\Projects\TMs" -SourceLanguage "en-US" -TargetLanguages "de-DE"
 
 Creates "D:\Projects\TMs\Contoso English-German Main.sdltm" translation memory with "English (United States)" source language and "German (Germany)" target language and "Contoso English-German Main" internal friendly name.
+.EXAMPLE
+New-FileBasedTM -Name "Contoso Main" -TMLocation "D:\Projects\TMs" -SourceLanguage "en-US" -TargetLanguages "de-DE fr-FR it-IT"
+
+Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "Contoso Main en-US_it-IT.sdltm" translation memories in "D:\Projects\TMs" location, with "English (United States)" source language and "German (Germany)", "French (France)" and "Italian (Italy)" respective target languages. Internal friendly TM names will be set to "Contoso Main en-US_de-DE", "Contoso Main en-US_fr-FR" and "Contoso Main en-US_it-IT" respectively.
 .EXAMPLE
 New-FileBasedTM -Path "D:\Projects\TMs\Contoso_English-German_Main.sdltm" -SrcLng "en-US" -TrgLng "de-DE"
 
 Creates "D:\Projects\TMs\Contoso_English-German_Main.sdltm" translation memory with "English (United States)" source language and "German (Germany)" target language and "Contoso_English-German_Main" internal friendly name.
+.EXAMPLE
+New-FileBasedTM -Path "D:\Projects\TMs\Contoso Main.sdltm" -SrcLng "en-US" -TrgLng "de-DE fr-FR it-IT"
+
+Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "Contoso Main en-US_it-IT.sdltm" translation memories in "D:\Projects\TMs" location, with "English (United States)" source language and "German (Germany)", "French (France)" and "Italian (Italy)" respective target languages. Internal friendly TM names will be set to "Contoso Main en-US_de-DE", "Contoso Main en-US_fr-FR" and "Contoso Main en-US_it-IT" respectively.
 #>
 	[CmdletBinding(DefaultParametersetName="Location")]
 
@@ -56,11 +75,11 @@ Creates "D:\Projects\TMs\Contoso_English-German_Main.sdltm" translation memory w
 		[Alias("SrcLng")]
 		[String] $SourceLanguage,
 		
-		# Locale code of translation memory target language.
+		# Space-, comma- or semicolon-separated list of locale codes of translation memory target languages.
 		# For locale codes, see https://msdn.microsoft.com/en-us/goglobal/bb896001.aspx
 		[Parameter (Mandatory = $true)]
-		[Alias("TrgLng")]
-		[String] $TargetLanguage,
+		[Alias("TrgLng","TargetLanguage")]
+		[String] $TargetLanguages,
 
 		# Optional translation memory description
 		[Alias("TMDesc")]
@@ -79,32 +98,57 @@ Creates "D:\Projects\TMs\Contoso_English-German_Main.sdltm" translation memory w
 		[Sdl.LanguagePlatform.TranslationMemory.WordCountFlags] $WordCountFlags = $(Get-DefaultWordCountFlags)
 	)
 
-	$TMSourceLanguage = Get-CultureInfo $SourceLanguage
-	$TMTargetLanguage = Get-CultureInfo $TargetLanguage
+	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
+		# Parse target languages from provided parameter
+		$TargetLanguagesList = $TargetLanguages -Split $LanguagesSeparator
+	}
 
-	switch ($PsCmdlet.ParameterSetName) {
-		"Path" {
-			$TMLocation = Split-Path -Path $Path
-			if ($TMLocation -eq "") {$TMLocation = "."}
-			$TMFileName = Split-Path -Path $Path -Leaf
+	# Loop through target languages and create package for each one
+	$TargetLanguagesList | ForEach {
+	
+		$Language = $_
+	
+		$TMSourceLanguage = Get-CultureInfo $SourceLanguage
+		$TMTargetLanguage = Get-CultureInfo $Language
+
+		switch ($PsCmdlet.ParameterSetName) {
+			"Path" {
+				# Parse TM filename and path to separate variables
+				$TMFileName = Split-Path -Path $Path -Leaf
+				$TMLocation = Split-Path -Path $Path
+				# If only filename was specified, i.e. path is empty, set path to current directory
+				if ($TMLocation -eq "") {
+					$TMLocation = "."
+				}
+			}
+			"Location" {
+				$TMFileName = $Name + $TMFileExtension
+			}
 		}
-		"Location" {
-			$TMFileName = $Name + ".sdltm"
+
+		# If TM location does not exist, create it
+		if (!(Test-Path -LiteralPath $TMLocation)) {
+			New-Item $TMLocation -Force -ItemType Directory | Out-Null
 		}
-	}
 
-	# If TM location does not exist, create it
-	if (!(Test-Path -LiteralPath $TMLocation)) {
-		New-Item $TMLocation -Force -ItemType Directory | Out-Null
-	}
+		# Construct full path to TM to be created
+		if ($TargetLanguagesList.Length -eq 1) {
+			# If only single target language was specified, use the TM filename as-is
+			$TMPath = Join-Path $TMLocation $TMFileName
+		}
+		else {
+			# If multiple target languages were specified, construct separate TM filename for each language
+			$TMBaseFileName = [System.IO.Path]::GetFileNameWithoutExtension($TMFileName)
+			$TMPath = Join-Path $TMLocation "$TMBaseFileName $($TMSourceLanguage.Name)_$($TMTargetLanguage.Name)$TMFileExtension"
+		}
 
-	$TMPath = Join-Path $TMLocation $TMFileName
-
-	if ($StudioVersion -le "Studio3") {
-		$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers)
-	}
-	else {
-		$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers, $TokenizerFlags, $WordCountFlags)
+		# Create TM
+		if ($StudioVersion -le "Studio3") {
+			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers)
+		}
+		else {
+			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers, $TokenizerFlags, $WordCountFlags)
+		}
 	}
 }
 
