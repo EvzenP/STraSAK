@@ -1,4 +1,4 @@
-﻿param([String]$StudioVersion = "Studio4")
+﻿param([String]$StudioVersion = "Studio5")
 
 if ("${Env:ProgramFiles(x86)}") {
     $ProgramFilesDir = "${Env:ProgramFiles(x86)}"
