@@ -12,7 +12,8 @@ Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.Langua
 
 $LanguagesSeparator = "\s+|;\s*|,\s*"
 
-$TMFileExtension = ".sdltm"
+$SDLTMFileExtension = ".sdltm"
+$TMXFileExtension = ".tmx"
 
 function New-FileBasedTM {
 <#
@@ -66,7 +67,7 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 
 #		# Path of translation memory file (including the ".sdltm" extension!) to be used as 'template' on which the new TM will be based.
 #		[Parameter (ParametersetName="Template")]
-#		[Alias("Template")]
+#		[Alias("Template","TMTemplate")]
 #		[String] $From,
 
 		# Locale code of translation memory source language.
@@ -122,7 +123,7 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 				}
 			}
 			"Location" {
-				$TMFileName = $Name + $TMFileExtension
+				$TMFileName = $Name + $SDLTMFileExtension
 			}
 		}
 
@@ -139,7 +140,7 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 		else {
 			# If multiple target languages were specified, construct separate TM filename for each language
 			$TMBaseFileName = [System.IO.Path]::GetFileNameWithoutExtension($TMFileName)
-			$TMPath = Join-Path $TMLocation "$TMBaseFileName $($TMSourceLanguage.Name)_$($TMTargetLanguage.Name)$TMFileExtension"
+			$TMPath = Join-Path $TMLocation "$TMBaseFileName $($TMSourceLanguage.Name)_$($TMTargetLanguage.Name)$SDLTMFileExtension"
 		}
 
 		# Create TM
@@ -152,7 +153,7 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 	}
 }
 
-function Get-FilebasedTM {
+function Get-FileBasedTM {
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!) to be opened.
 		[Parameter (Mandatory = $true)]
@@ -220,7 +221,7 @@ function Get-TMTargetLanguage {
 		[String] $Path
 	)
 
-	$TM = Get-FilebasedTM $Path
+	$TM = Get-FileBasedTM $Path
 	$Direction = $TM.LanguageDirection
 	return $Direction.TargetLanguage
 }
@@ -277,7 +278,7 @@ function Get-TMFuzzyIndexes {
 		[String] $Path
 	)
 
-	$TM = Get-FilebasedTM $Path
+	$TM = Get-FileBasedTM $Path
 	$FuzzyIndexes = $TM.FuzzyIndexes
 	return $FuzzyIndexes
 }
@@ -303,7 +304,7 @@ function Get-TMRecognizers {
 		[String] $Path
 	)
 
-	$TM = Get-FilebasedTM $Path
+	$TM = Get-FileBasedTM $Path
 	$Recognizers = $TM.Recognizers
 	return $Recognizers
 }
@@ -320,7 +321,7 @@ function Get-TMTokenizerFlags {
 		[String] $Path
 	)
 
-	$TM = Get-FilebasedTM $Path
+	$TM = Get-FileBasedTM $Path
 	$TokenizerFlags = $TM.TokenizerFlags
 	return $TokenizerFlags
 }
@@ -337,7 +338,7 @@ function Get-TMWordCountFlags {
 		[String] $Path
 	)
 
-	$TM = Get-FilebasedTM $Path
+	$TM = Get-FileBasedTM $Path
 	$WordcountFlags = $TM.WordCountFlags
 	return $WordcountFlags
 }
@@ -386,7 +387,7 @@ Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both file
 	
 	Write-Host "$(Split-Path $TMXPath -Leaf) -> $(Split-Path $Path -Leaf)" -ForegroundColor White
 	
-	$TM = Get-FilebasedTM $Path
+	$TM = Get-FileBasedTM $Path
 	$Importer = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryImporter ($TM.LanguageDirection)
 	$Importer.Add_BatchImported($OnBatchImported)
 	$Importer.Import($TMXPath)
@@ -451,7 +452,7 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 	
 	Get-ChildItem $TMLocation *.sdltm -File -Recurse:$Recurse | ForEach-Object {
 		$SDLTM = $_
-		$TMXName = $SDLTM.Name.Replace(".sdltm", ".tmx")
+		$TMXName = $SDLTM.Name.Replace($SDLTMFileExtension, $TMXFileExtension)
 		
 		if ($TMXLocation -eq "") {
 			$TMXPath = $SDLTM.DirectoryName
@@ -462,7 +463,7 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 		
 		Write-Host "$($SDLTM.Name) -> $TMXName" -ForegroundColor White
 		
-		$TM = Get-FilebasedTM $SDLTM.FullName
+		$TM = Get-FileBasedTM $SDLTM.FullName
 		$Exporter = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryExporter ($TM.LanguageDirection)
 		$Exporter.Add_BatchExported($OnBatchExported)
 		$Exporter.Export("$TMXPath\$TMXName", ($Force.IsPresent))
@@ -474,7 +475,7 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 }
 
 Export-ModuleMember New-FileBasedTM
-Export-ModuleMember Get-FilebasedTM
+Export-ModuleMember Get-FileBasedTM
 Export-ModuleMember Get-ServerBasedTM
 Export-ModuleMember Get-DefaultFuzzyIndexes
 Export-ModuleMember Get-DefaultRecognizers
