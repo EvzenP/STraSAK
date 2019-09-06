@@ -391,12 +391,35 @@ function Get-TMWordCountFlags {
 	return $WordcountFlags
 }
 
+function Get-FilterString {
+	param(
+		# Path to *.sdltm.filters file containing filter definition(s) exported from Studio
+		[parameter(Mandatory = $true)]
+		[String]$FilterFilePath,
+		
+		# Name of the filter to be loaded from the provided filters file
+		[parameter(Mandatory = $true)]
+		[String]$FilterName
+	)
+	
+	$FilterString = $null
+	if ($FilterFilePath -ne $null -and $FilterFilePath -ne "") {
+		$FilterFilePath = (Resolve-Path -LiteralPath $FilterFilePath).ProviderPath
+		
+		[xml]$Filters = Get-Content -Path $FilterFilePath
+		$FilterString = ($Filters.TranslationMemoryFilters.Filter | Where-Object -Property Name -eq $FilterName).Expression
+	}
+	return $FilterString
+}
+
 function Import-TMX {
 <#
 .SYNOPSIS
-Imports TMX file to Trados Studio TM.
+Imports TMX file to Trados Studio TM, optionally applying a filter.
 .DESCRIPTION
 Imports content of TMX file to Trados Studio translation memory.
+Optionally, a filter can be applied during import, allowing to import only translation units meeting certain criteria.
+Filter is loaded from a filter file with ".sdltm.filters" extension, which can be obtained by exporting it from Trados Studio (from Translation Memories view using "Export filters to file" function).
 .EXAMPLE
 Import-TMX -Path "D:\Projects\TMs\EN-DE.sdltm" -TMXPath "D:\TMX\English-German.tmx"
 
@@ -405,6 +428,12 @@ Imports "D:\TMX\English-German.tmx" file to "D:\Projects\TMs\EN-DE.sdltm" transl
 Import-TMX -Path "EN-DE.sdltm" -TMXPath "English-German.tmx"
 
 Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both files are located in current folder.
+.EXAMPLE
+Import-TMX -Path "EN-DE.sdltm" -TMXPath "English-German.tmx" -FilterFile "D:\Projects\Filters\Microsoft.sdltm.filters" -FilterName "Word 2016"
+
+Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both files are located in current folder.
+A filter named "Word 2016" from a filter file "D:\Projects\Filters\Microsoft.sdltm.filters" will be applied during import.
+Only translation units meeting criteria defined in the "Word 2016" filter will be actually imported into the translation memory.
 #>
 	param(
 		# Path to translation memory file (including the ".sdltm" extension!).
@@ -414,10 +443,31 @@ Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both file
 		
 		# Path of TMX file (including the ".tmx" extension!) to be imported.
 		[Parameter (Mandatory = $true)]
-		[String] $TMXPath
+		[String] $TMXPath,
+		
+		# Path to TM filter file, containing definition of filter to be used for import.
+		# Only translation units matching the filter criteria will be imported.
+		# (TM filter file can be created in Studio in Translation Memories view using "Export filters to file" function)
+		[Alias("FltFile", "FltPath", "FilterPath")]
+		[String] $FilterFile,
+		
+		# Name of the filter to be used for export.
+		# Only translation units matching the filter criteria will be exported.
+		# Filter must exist in the filter file specified using FilterFile parameter.
+		[Alias("FltName")]
+		[String] $FilterName
 	)
-
-	# Event handler scriptblock
+	
+	# Get filter string from the provided filter file
+	$FilterString = Get-FilterString -FilterFilePath $FilterFile -FilterName $FilterName
+	if ($FilterString -eq $null) {
+		Write-Host "Filter name not found, importing complete TMX..." -ForegroundColor Yellow
+	}
+	
+	# Create BatchImported event handler type
+	$BatchImportedEventHandlerType = [System.Type] "System.EventHandler[Sdl.LanguagePlatform.TranslationMemoryApi.BatchImportedEventArgs]"
+	
+	# BatchImported event handler scriptblock
 	$OnBatchImported = {
 		param($sender, $e)
 		$Stats = $e.Statistics
@@ -428,29 +478,50 @@ Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both file
 		$TotalMerged = $Stats.MergedTranslationUnits
 		$TotalErrors = $Stats.Errors
 		Write-Host "TUs processed: $TotalRead, imported: $TotalImported (added: $TotalAdded, merged: $TotalMerged), discarded: $TotalDiscarded, errors: $TotalErrors`r" -NoNewLine
+	} -as $BatchImportedEventHandlerType
+	
+	# Get full TM path
+	if ($Path -ne $null -and $Path -ne "") {
+		$Path = (Resolve-Path -LiteralPath $Path).ProviderPath
 	}
 	
-	$Path = (Resolve-Path -LiteralPath $Path).ProviderPath
-	$TMXPath = (Resolve-Path -LiteralPath $TMXPath).ProviderPath
+	# Get full TMX path
+	if ($TMXPath -ne $null -and $TMXPath -ne "") {
+		$TMXPath = (Resolve-Path -LiteralPath $TMXPath).ProviderPath
+	}
 	
+	# Display info about import source and target
 	Write-Host "$(Split-Path $TMXPath -Leaf) -> $(Split-Path $Path -Leaf)" -ForegroundColor White
 	
+	# Get the source TM object and create importer object
 	$TM = Get-FileBasedTM $Path
 	$Importer = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryImporter ($TM.LanguageDirection)
-	$Importer.Add_BatchImported($OnBatchImported)
+	
+	# Parse the filter string and set the importer filter expression
+	# TODO: error handling (e.g. when filter uses fields which do not exist in the TM)
+	if ($FilterString -ne $null) {
+		$FilterExpr = [Sdl.LanguagePlatform.TranslationMemory.FilterExpressionParser]::Parse($FilterString, $TM.FieldDefinitions)
+		$Importer.ImportSettings.Filter = $FilterExpr
+	}
+	
+	# Register import event handler, do the import and unregister event handler afterwards
+	$Importer.add_BatchImported($OnBatchImported)
 	$Importer.Import($TMXPath)
-	$Importer.Remove_BatchImported($OnBatchImported)
+	$Importer.remove_BatchImported($OnBatchImported)
 	
 	# when all is done, output nothing WITH NEW LINE
+	# so that the last progress output from event handler is kept
 	Write-Host $null
 }
 
 function Export-TMX {
 <#
 .SYNOPSIS
-Exports Trados Studio translation memory to TMX file.
+Exports Trados Studio translation memory to TMX file, optionally applying a filter.
 .DESCRIPTION
 Exports one or more Trados Studio translation memories to TMX file(s).
+Optionally, a filter can be applied during export, allowing to export only translation units meeting certain criteria.
+Filter is loaded from a filter file with ".sdltm.filters" extension, which can be obtained by exporting it from Trados Studio (from Translation Memories view using "Export filters to file" function).
 .EXAMPLE
 Export-TMX
 
@@ -460,9 +531,11 @@ Export-TMX -TMLocation "D:\Projects\TMs" -TMXLocation "D:\TMX_Exports" -Recurse 
 
 Exports to TMX all Trados Studio TMs present in "D:\Projects\TMs" folder and its subfolders. Exported files will be stored to "D:\TMX_Exports" folder. Existing TMX files will be overwritten.
 .EXAMPLE
-Export-TMX -TMLocation "D:\Projects\TMs\EN-DE.sdltm"
+Export-TMX -TMLocation "D:\Projects\TMs\EN-DE.sdltm" -FilterFile "D:\Projects\Filters\Microsoft.sdltm.filters" -FilterName "Word 2016"
 
 Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Exported file will be stored in the same location as source file (i.e. "D:\Projects\TMs").
+A filter named "Word 2016" from a filter file "D:\Projects\Filters\Microsoft.sdltm.filters" will be applied during export.
+Exported TMX will then contain only translation units meeting criteria defined in the "Word 2016" filter.
 #>
 	param(
 		# Path to either single TM file, or to directory where one or more TMs are located.
@@ -475,6 +548,18 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 		[Alias("TMXLoc")]
 		[String] $TMXLocation,
 		
+		# Path to TM filter file, containing definition of filter to be used for export.
+		# Only translation units matching the filter criteria will be exported.
+		# (TM filter file can be created in Studio in Translation Memories view using "Export filters to file" function)
+		[Alias("FltFile","FltPath","FilterPath")]
+		[String] $FilterFile,
+		
+		# Name of the filter to be used for export.
+		# Only translation units matching the filter criteria will be exported.
+		# Filter must exist in the filter file specified using FilterFile parameter.
+		[Alias("FltName")]
+		[String] $FilterName,
+		
 		# Allows to overwrite any existing file
 		[Alias("Overwrite")]
 		[Switch] $Force,
@@ -483,25 +568,38 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 		[Alias("r")]
 		[Switch] $Recurse
 	)
-
-	$TMLocation = (Resolve-Path -LiteralPath $TMLocation).ProviderPath
 	
-	if ($TMXLocation -ne "") {
-		$TMXLocation = (Resolve-Path -LiteralPath $TMXLocation).ProviderPath
+	# Get filter string from the provided filter file
+	$FilterString = Get-FilterString -FilterFilePath $FilterFile -FilterName $FilterName
+	if ($FilterString -eq $null) {
+		Write-Host "Filter name not found, exporting complete TM..." -ForegroundColor Yellow
 	}
 	
-	# Event handler scriptblock
+	# Create BatchExported event handler type
+	$BatchExportedEventHandlerType = [System.Type] "System.EventHandler[Sdl.LanguagePlatform.TranslationMemoryApi.BatchExportedEventArgs]"
+	
+	# BatchExported event handler scriptblock
 	$OnBatchExported = {
-		param($sender, $e)
+		param([System.Object]$sender, [Sdl.LanguagePlatform.TranslationMemoryApi.BatchExportedEventArgs]$e)
 		$TotalProcessed = $e.TotalProcessed
 		$TotalExported = $e.TotalExported
 		Write-Host "TUs processed: $TotalProcessed, exported: $TotalExported`r" -NoNewLine
+	} -as $BatchExportedEventHandlerType
+	
+	# Get full TMX location path
+	if ($TMXLocation -ne $null -and $TMXLocation -ne "") {
+		$TMXLocation = (Resolve-Path -LiteralPath $TMXLocation).ProviderPath
 	}
 	
-	Get-ChildItem $TMLocation *.sdltm -File -Recurse:$Recurse | ForEach-Object {
+	# Get full TM location path and iterate over all *.sdltm files in the location
+	# (if single file is specified, process only that file)
+	$TMLocation = (Resolve-Path -LiteralPath $TMLocation).ProviderPath
+	Get-ChildItem -Path $TMLocation -Filter "*$SDLTMFileExtension" -File -Recurse:$Recurse | ForEach-Object {
 		$SDLTM = $_
 		$TMXName = $SDLTM.Name.Replace($SDLTMFileExtension, $TMXFileExtension)
 		
+		# If TMX export location was not specified, use the location of source SDLTM file,
+		# otherwise use the specified location
 		if ($TMXLocation -eq "") {
 			$TMXPath = $SDLTM.DirectoryName
 		}
@@ -509,15 +607,27 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 			$TMXPath = $TMXLocation
 		}
 		
+		# Get the source TM object and create exporter object
+		$TM = Get-FileBasedTM $SDLTM.FullName
+		$Exporter = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryExporter $TM.LanguageDirection
+		
+		# Parse the filter string and set the exporter filter expression
+		# TODO: error handling (e.g. when filter uses fields which do not exist in the TM)
+		if ($FilterString -ne $null) {
+			$FilterExpr = [Sdl.LanguagePlatform.TranslationMemory.FilterExpressionParser]::Parse($FilterString, $TM.FieldDefinitions)
+			$Exporter.FilterExpression = $FilterExpr
+		}
+		
+		# Display info about export source and target
 		Write-Host "$($SDLTM.Name) -> $TMXName" -ForegroundColor White
 		
-		$TM = Get-FileBasedTM $SDLTM.FullName
-		$Exporter = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryExporter ($TM.LanguageDirection)
-		$Exporter.Add_BatchExported($OnBatchExported)
+		# Register export event handler, do the export and unregister event handler afterwards
+		$Exporter.add_BatchExported($OnBatchExported)
 		$Exporter.Export("$TMXPath\$TMXName", ($Force.IsPresent))
-		$Exporter.Remove_BatchExported($OnBatchExported)
+		$Exporter.remove_BatchExported($OnBatchExported)
 		
 		# when all is done, output nothing WITH NEW LINE
+		# so that the last progress output from event handler is kept
 		Write-Host $null
 	}
 }
