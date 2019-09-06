@@ -217,8 +217,8 @@ Analyze task is run after scanning, converting and copying to target languages.
 		$TMPaths = Get-ChildItem -LiteralPath $TMLocation *.sdltm | ForEach {$_.FullName}
 		ForEach($TMPath in $TMPaths) {
 			# Get TM language pair
-			$TMSourceLanguage = Get-TMSourceLanguage $TMPath | ForEach {Get-Language $_.Name}
-			$TMTargetLanguage = Get-TMTargetLanguage $TMPath | ForEach {Get-Language $_.Name}
+			$TMSourceLanguage = Get-TMSourceLanguage -Path $TMPath | ForEach {Get-Language $_.Name}
+			$TMTargetLanguage = Get-TMTargetLanguage -Path $TMPath | ForEach {Get-Language $_.Name}
 
 			# If TM languages are not one of the project lang pairs, skip to next TM
 			if ($tmSourceLanguage -ne $SourceLanguage -or $tmTargetLanguage -notin $TargetLanguagesList) {continue}

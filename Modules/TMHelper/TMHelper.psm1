@@ -203,12 +203,20 @@ function Get-ServerBasedTM {
 function Get-TMSourceLanguage {
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
-		[Parameter (Mandatory = $true)]
+		[Parameter (ParameterSetName = "File", Mandatory = $true)]
 		[Alias("TMPath")]
-		[String] $Path
+		[String] $Path,
+		
+		# Translation memory object.
+		[Parameter (ParameterSetName = "Object", Mandatory = $true)]
+		[Alias("TMObject")]
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory] $TM
 	)
 	
-	$TM = Get-FilebasedTM $Path
+	if ($PsCmdlet.ParameterSetName -eq "File") {
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory] $TM = Get-FileBasedTM $Path
+	}
+	
 	$Direction = $TM.LanguageDirection
 	return $Direction.SourceLanguage
 }
@@ -216,12 +224,20 @@ function Get-TMSourceLanguage {
 function Get-TMTargetLanguage {
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
-		[Parameter (Mandatory = $true)]
+		[Parameter (ParameterSetName = "File", Mandatory = $true)]
 		[Alias("TMPath")]
-		[String] $Path
+		[String] $Path,
+		
+		# Translation memory object.
+		[Parameter (ParameterSetName = "Object", Mandatory = $true)]
+		[Alias("TMObject")]
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM
 	)
-
-	$TM = Get-FileBasedTM $Path
+	
+	if ($PsCmdlet.ParameterSetName -eq "File") {
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM = Get-FileBasedTM $Path
+	}
+	
 	$Direction = $TM.LanguageDirection
 	return $Direction.TargetLanguage
 }
@@ -273,12 +289,20 @@ function Get-DefaultFuzzyIndexes {
 function Get-TMFuzzyIndexes {
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
-		[Parameter (Mandatory = $true)]
+		[Parameter (ParameterSetName = "File", Mandatory = $true)]
 		[Alias("TMPath")]
-		[String] $Path
+		[String] $Path,
+		
+		# Translation memory object.
+		[Parameter (ParameterSetName = "Object", Mandatory = $true)]
+		[Alias("TMObject")]
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM
 	)
-
-	$TM = Get-FileBasedTM $Path
+	
+	if ($PsCmdlet.ParameterSetName -eq "File") {
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM = Get-FileBasedTM $Path
+	}
+	
 	$FuzzyIndexes = $TM.FuzzyIndexes
 	return $FuzzyIndexes
 }
@@ -299,12 +323,20 @@ function Get-DefaultRecognizers {
 function Get-TMRecognizers {
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
-		[Parameter (Mandatory = $true)]
+		[Parameter (ParameterSetName = "File", Mandatory = $true)]
 		[Alias("TMPath")]
-		[String] $Path
+		[String] $Path,
+		
+		# Translation memory object.
+		[Parameter (ParameterSetName = "Object", Mandatory = $true)]
+		[Alias("TMObject")]
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM
 	)
-
-	$TM = Get-FileBasedTM $Path
+	
+	if ($PsCmdlet.ParameterSetName -eq "File") {
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM = Get-FileBasedTM $Path
+	}
+	
 	$Recognizers = $TM.Recognizers
 	return $Recognizers
 }
@@ -316,12 +348,20 @@ function Get-DefaultTokenizerFlags {
 function Get-TMTokenizerFlags {
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
-		[Parameter (Mandatory = $true)]
+		[Parameter (ParameterSetName = "File", Mandatory = $true)]
 		[Alias("TMPath")]
-		[String] $Path
+		[String] $Path,
+		
+		# Translation memory object.
+		[Parameter (ParameterSetName = "Object", Mandatory = $true)]
+		[Alias("TMObject")]
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM
 	)
-
-	$TM = Get-FileBasedTM $Path
+	
+	if ($PsCmdlet.ParameterSetName -eq "File") {
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM = Get-FileBasedTM $Path
+	}
+	
 	$TokenizerFlags = $TM.TokenizerFlags
 	return $TokenizerFlags
 }
@@ -333,12 +373,20 @@ function Get-DefaultWordCountFlags {
 function Get-TMWordCountFlags {
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
-		[Parameter (Mandatory = $true)]
+		[Parameter (ParameterSetName = "File", Mandatory = $true)]
 		[Alias("TMPath")]
-		[String] $Path
+		[String] $Path,
+		
+		# Translation memory object.
+		[Parameter (ParameterSetName = "Object", Mandatory = $true)]
+		[Alias("TMObject")]
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM
 	)
-
-	$TM = Get-FileBasedTM $Path
+	
+	if ($PsCmdlet.ParameterSetName -eq "File") {
+		[Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory]$TM = Get-FileBasedTM $Path
+	}
+	
 	$WordcountFlags = $TM.WordCountFlags
 	return $WordcountFlags
 }
