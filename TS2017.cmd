@@ -2,7 +2,6 @@
 @echo off
 
 :: get Documents folder location from registry
-rem for /f "tokens=2*" %%A in ('reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" /v "Personal" 2^>nul ^| find "REG_"') do call set "DocumentsFolder=%%B"
 for /f "tokens=2*" %%A in ('reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" /v "Personal" 2^>nul') do call set "DocumentsFolder=%%B"
 :: add Modules location to PSModulePath variable
 set "PSModulePath=%DocumentsFolder%\WindowsPowerShell\Modules\;%PSModulePath%"
@@ -19,10 +18,8 @@ set _args=%*
 rem this is to prevent PS errors if launched with empty command line
 if not defined _args set "_args= "
 set _args=!_args:'=''!
-rem set _args=!_args:"=''!
 set _args=!_args:"="""!
 type "%~f0" | %POWERSHELL% -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "%POWERSHELL% -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ([ScriptBlock]::Create([Console]::In.ReadToEnd()+';!_args!'))"
-rem type "%~f0" | %POWERSHELL% -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "%POWERSHELL% -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ('Set-Location -LiteralPath ''%CD%'';'+[ScriptBlock]::Create([Console]::In.ReadToEnd()+';!_args!'))"
 endlocal
 
 exit /b 0
