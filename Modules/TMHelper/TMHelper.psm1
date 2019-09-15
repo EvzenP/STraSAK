@@ -201,6 +201,7 @@ function Get-ServerBasedTM {
 }
 
 function Get-TMSourceLanguage {
+	[CmdletBinding(DefaultParameterSetName="File")]
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
 		[Parameter (ParameterSetName = "File", Mandatory = $true)]
@@ -222,6 +223,7 @@ function Get-TMSourceLanguage {
 }
 
 function Get-TMTargetLanguage {
+	[CmdletBinding(DefaultParameterSetName = "File")]
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
 		[Parameter (ParameterSetName = "File", Mandatory = $true)]
@@ -287,6 +289,7 @@ function Get-DefaultFuzzyIndexes {
 }
 
 function Get-TMFuzzyIndexes {
+	[CmdletBinding(DefaultParameterSetName = "File")]
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
 		[Parameter (ParameterSetName = "File", Mandatory = $true)]
@@ -321,6 +324,7 @@ function Get-DefaultRecognizers {
 }
 
 function Get-TMRecognizers {
+	[CmdletBinding(DefaultParameterSetName = "File")]
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
 		[Parameter (ParameterSetName = "File", Mandatory = $true)]
@@ -346,6 +350,7 @@ function Get-DefaultTokenizerFlags {
 }
 
 function Get-TMTokenizerFlags {
+	[CmdletBinding(DefaultParameterSetName = "File")]
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
 		[Parameter (ParameterSetName = "File", Mandatory = $true)]
@@ -371,6 +376,7 @@ function Get-DefaultWordCountFlags {
 }
 
 function Get-TMWordCountFlags {
+	[CmdletBinding(DefaultParameterSetName = "File")]
 	param(
 		# Path of translation memory file (including the ".sdltm" extension!).
 		[Parameter (ParameterSetName = "File", Mandatory = $true)]
