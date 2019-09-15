@@ -10,6 +10,49 @@ else {
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.LanguagePlatform.TranslationMemoryApi.dll"
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.LanguagePlatform.TranslationMemory.dll"
 
+# Helper for handling PowerShell runspace issues with multithreaded event handlers
+# https://stackoverflow.com/questions/53788232/system-threading-timer-kills-the-powershell-console/53789011
+Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Management.Automation.Runspaces;
+
+public class RunspacedDelegateFactory
+{
+    public static Delegate NewRunspacedDelegate(Delegate _delegate, Runspace runspace)
+    {
+        Action setRunspace = () => Runspace.DefaultRunspace = runspace;
+
+        return ConcatActionToDelegate(setRunspace, _delegate);
+    }
+
+    private static Expression ExpressionInvoke(Delegate _delegate, params Expression[] arguments)
+    {
+        var invokeMethod = _delegate.GetType().GetMethod("Invoke");
+
+        return Expression.Call(Expression.Constant(_delegate), invokeMethod, arguments);
+    }
+
+    public static Delegate ConcatActionToDelegate(Action a, Delegate d)
+    {
+        var parameters =
+            d.GetType().GetMethod("Invoke").GetParameters()
+            .Select(p => Expression.Parameter(p.ParameterType, p.Name))
+            .ToArray();
+
+        Expression body = Expression.Block(ExpressionInvoke(a), ExpressionInvoke(d, parameters));
+
+        var lambda = Expression.Lambda(d.GetType(), body, parameters);
+
+        var compiled = lambda.Compile();
+
+        return compiled;
+    }
+}
+'@
+
 $LanguagesSeparator = "\s+|;\s*|,\s*"
 
 $SDLTMFileExtension = ".sdltm"
@@ -469,6 +512,9 @@ Imports "English-German.tmx" file to "EN-DE.sdltm" translation memory. Both file
 A filter named "Word 2016" from a filter file "D:\Projects\Filters\Microsoft.sdltm.filters" will be applied during import.
 Only translation units meeting criteria defined in the "Word 2016" filter will be actually imported into the translation memory.
 #>
+	
+	[CmdletBinding()]
+	
 	param(
 		# Path to translation memory file (including the ".sdltm" extension!).
 		[Parameter (Mandatory = $true)]
@@ -485,38 +531,49 @@ Only translation units meeting criteria defined in the "Word 2016" filter will b
 		[Alias("FltFile", "FltPath", "FilterPath")]
 		[String] $FilterFile,
 		
-		# Name of the filter to be used for export.
-		# Only translation units matching the filter criteria will be exported.
+		# Name of the filter to be used for import.
+		# Only translation units matching the filter criteria will be imported.
 		# Filter must exist in the filter file specified using FilterFile parameter.
 		[Alias("FltName")]
 		[String] $FilterName
 	)
 	
 	# Get filter string from the provided filter file
-	$FilterString = Get-FilterString -FilterFilePath $FilterFile -FilterName $FilterName
-	if ($FilterString -eq $null) {
-		Write-Host "Filter name not found, importing complete TMX..." -ForegroundColor Yellow
+	if ($PSBoundParameters.ContainsKey('FilterFile')) {
+		$FilterString = Get-FilterString -FilterFilePath $FilterFile -FilterName $FilterName
+		if ($FilterString -eq $null) {
+			Write-Host "Filter name not found, importing complete TMX..." -ForegroundColor Yellow
+		}
 	}
 	
-	# Create BatchImported event handler type
-	$BatchImportedEventHandlerType = [System.Type] "System.EventHandler[Sdl.LanguagePlatform.TranslationMemoryApi.BatchImportedEventArgs]"
-	
 	# BatchImported event handler scriptblock
-	$OnBatchImported = {
-		param($sender, $e)
+	$OnBatchImported = [System.EventHandler[Sdl.LanguagePlatform.TranslationMemoryApi.BatchImportedEventArgs]] {
+		param (
+			[System.Object] $sender,
+			[Sdl.LanguagePlatform.TranslationMemoryApi.BatchImportedEventArgs] $e
+		)
 		$Stats = $e.Statistics
 		$TotalRead = $Stats.TotalRead
 		$TotalImported = $Stats.TotalImported
 		$TotalAdded = $Stats.AddedTranslationUnits
+		$TotalOverwritten = $Stats.OverwrittenTranslationUnits
 		$TotalDiscarded = $Stats.DiscardedTranslationUnits
 		$TotalMerged = $Stats.MergedTranslationUnits
 		$TotalErrors = $Stats.Errors
-		Write-Host "TUs processed: $TotalRead, imported: $TotalImported (added: $TotalAdded, merged: $TotalMerged), discarded: $TotalDiscarded, errors: $TotalErrors`r" -NoNewLine
-	} -as $BatchImportedEventHandlerType
+		$TotalBad = $Stats.BadTranslationUnits
+		$RawTUs = $Stats.RawTUs
+		$Message = "TUs raw: $RawTUs, processed: $TotalRead, imported: $TotalImported (added: $TotalAdded, merged: $TotalMerged, overwritten: $TotalOverwritten), discarded: $TotalDiscarded, errors: $TotalErrors, bad: $TotalBad"
+		
+		# workaround for overwriting longer text with shorter text
+		# (this happens because the import may consist of multiple background phases in Studio API)
+		$LineLength = $Host.UI.RawUI.WindowSize.Width
+		Write-Host "$($Message.PadRight($LineLength - 1))`r" -NoNewLine
+	}
+	$OnBatchImportedDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnBatchImported, [Runspace]::DefaultRunspace)
 	
 	# Get full TM path
 	if ($Path -ne $null -and $Path -ne "") {
-		$Path = (Resolve-Path -LiteralPath $Path).ProviderPath
+		$SDLTMPath = (Resolve-Path -LiteralPath $Path).ProviderPath
 	}
 	
 	# Get full TMX path
@@ -525,11 +582,15 @@ Only translation units meeting criteria defined in the "Word 2016" filter will b
 	}
 	
 	# Display info about import source and target
-	Write-Host "$(Split-Path $TMXPath -Leaf) -> $(Split-Path $Path -Leaf)" -ForegroundColor White
+	Write-Host "$(Split-Path $TMXPath -Leaf) -> $(Split-Path $SDLTMPath -Leaf)" -ForegroundColor White
 	
 	# Get the source TM object and create importer object
-	$TM = Get-FileBasedTM $Path
+	$TM = Get-FileBasedTM $SDLTMPath
 	$Importer = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.TranslationMemoryImporter ($TM.LanguageDirection)
+	
+	$Importer.ImportSettings.CheckMatchingSublanguages = $true
+	$Importer.ImportSettings.ExistingFieldsUpdateMode = [Sdl.LanguagePlatform.TranslationMemory.ImportSettings+FieldUpdateMode]::Merge
+	$Importer.ImportSettings.ExistingTUsUpdateMode = [Sdl.LanguagePlatform.TranslationMemory.ImportSettings+TUUpdateMode]::AddNew
 	
 	# Parse the filter string and set the importer filter expression
 	# TODO: error handling (e.g. when filter uses fields which do not exist in the TM)
@@ -539,9 +600,9 @@ Only translation units meeting criteria defined in the "Word 2016" filter will b
 	}
 	
 	# Register import event handler, do the import and unregister event handler afterwards
-	$Importer.add_BatchImported($OnBatchImported)
+	$Importer.add_BatchImported($OnBatchImportedDelegate)
 	$Importer.Import($TMXPath)
-	$Importer.remove_BatchImported($OnBatchImported)
+	$Importer.remove_BatchImported($OnBatchImportedDelegate)
 	
 	# when all is done, output nothing WITH NEW LINE
 	# so that the last progress output from event handler is kept
@@ -571,6 +632,9 @@ Exports a single "D:\Projects\TMs\EN-DE.sdltm" translation memory to TMX. Export
 A filter named "Word 2016" from a filter file "D:\Projects\Filters\Microsoft.sdltm.filters" will be applied during export.
 Exported TMX will then contain only translation units meeting criteria defined in the "Word 2016" filter.
 #>
+	
+	[CmdletBinding()]
+	
 	param(
 		# Path to either single TM file, or to directory where one or more TMs are located.
 		# If this parameter is omitted, current directory is used by default.
@@ -604,21 +668,24 @@ Exported TMX will then contain only translation units meeting criteria defined i
 	)
 	
 	# Get filter string from the provided filter file
-	$FilterString = Get-FilterString -FilterFilePath $FilterFile -FilterName $FilterName
-	if ($FilterString -eq $null) {
-		Write-Host "Filter name not found, exporting complete TM..." -ForegroundColor Yellow
+	if ($PSBoundParameters.ContainsKey('FilterFile')) {
+		$FilterString = Get-FilterString -FilterFilePath $FilterFile -FilterName $FilterName
+		if ($FilterString -eq $null) {
+			Write-Host "Filter name not found, exporting complete TM..." -ForegroundColor Yellow
+		}
 	}
 	
-	# Create BatchExported event handler type
-	$BatchExportedEventHandlerType = [System.Type] "System.EventHandler[Sdl.LanguagePlatform.TranslationMemoryApi.BatchExportedEventArgs]"
-	
 	# BatchExported event handler scriptblock
-	$OnBatchExported = {
-		param([System.Object]$sender, [Sdl.LanguagePlatform.TranslationMemoryApi.BatchExportedEventArgs]$e)
+	$OnBatchExported = [System.EventHandler[Sdl.LanguagePlatform.TranslationMemoryApi.BatchExportedEventArgs]] {
+		param (
+			[System.Object] $sender,
+			[Sdl.LanguagePlatform.TranslationMemoryApi.BatchExportedEventArgs] $e
+		)
 		$TotalProcessed = $e.TotalProcessed
 		$TotalExported = $e.TotalExported
 		Write-Host "TUs processed: $TotalProcessed, exported: $TotalExported`r" -NoNewLine
-	} -as $BatchExportedEventHandlerType
+	}
+	$OnBatchExportedDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnBatchExported, [Runspace]::DefaultRunspace)
 	
 	# Get full TMX location path
 	if ($TMXLocation -ne $null -and $TMXLocation -ne "") {
@@ -656,9 +723,9 @@ Exported TMX will then contain only translation units meeting criteria defined i
 		Write-Host "$($SDLTM.Name) -> $TMXName" -ForegroundColor White
 		
 		# Register export event handler, do the export and unregister event handler afterwards
-		$Exporter.add_BatchExported($OnBatchExported)
+		$Exporter.add_BatchExported($OnBatchExportedDelegate)
 		$Exporter.Export("$TMXPath\$TMXName", ($Force.IsPresent))
-		$Exporter.remove_BatchExported($OnBatchExported)
+		$Exporter.remove_BatchExported($OnBatchExportedDelegate)
 		
 		# when all is done, output nothing WITH NEW LINE
 		# so that the last progress output from event handler is kept
