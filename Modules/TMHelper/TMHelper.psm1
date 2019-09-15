@@ -85,7 +85,13 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 		# Optional translation memory description
 		[Alias("TMDesc")]
 		[String] $Description = "",
-
+		
+		# Return created TM object(s)
+		# If single target language is specified, a single TM object is returned.
+		# If multiple target languages are specified, an array of TM objects is returned.
+		[Alias("PassThrough")]
+		[Switch] $PassThru,
+		
 		# Set of fuzzy indexes that should be created in translation memory.
 		[Sdl.LanguagePlatform.TranslationMemory.FuzzyIndexes] $FuzzyIndexes = $(Get-DefaultFuzzyIndexes),
 
@@ -98,12 +104,17 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 		# Flags affecting word count behavior for translation memory
 		[Sdl.LanguagePlatform.TranslationMemory.WordCountFlags] $WordCountFlags = $(Get-DefaultWordCountFlags)
 	)
-
+	
+	# Parse target languages from provided parameter
 	if ($TargetLanguages -ne $null -and $TargetLanguages -ne "") {
-		# Parse target languages from provided parameter
 		$TargetLanguagesList = $TargetLanguages -Split $LanguagesSeparator
 	}
-
+	
+	# Initialize output array
+	if ($PassThru) {
+		$TMList = @()
+	}
+	
 	# Loop through target languages and create package for each one
 	$TargetLanguagesList | ForEach {
 	
@@ -142,15 +153,32 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 			$TMBaseFileName = [System.IO.Path]::GetFileNameWithoutExtension($TMFileName)
 			$TMPath = Join-Path $TMLocation "$TMBaseFileName $($TMSourceLanguage.Name)_$($TMTargetLanguage.Name)$SDLTMFileExtension"
 		}
-
-		# Create TM
-		if ($StudioVersion -le "Studio3") {
+		
+		# Create TM using Studio version specific constructor
+		[int] $_StudioVersion = $StudioVersion.Replace("Studio", "")
+		if ($_StudioVersion -le 3) {
 			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers)
-		}
-		else {
+		} elseif ($_StudioVersion -eq 4) {
 			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers, $TokenizerFlags, $WordCountFlags)
+		} else {
+			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers, $TokenizerFlags, $WordCountFlags, $true)
+		}
+		
+		# Add the created TM to output array (if exists)
+		if ((Test-Path variable:$TMList) -and ($TM -ne $null)) {
+			$TMList += $TM
 		}
 	}
+	
+	# If output array contains only single created TM, return the single TM object, otherwise return the array
+	if ($PassThru) {
+		if ($TMList.Count -eq 1) {
+			return $TMList[0]
+		} else {
+			return $TMList
+		}
+	}
+	
 }
 
 function Get-FileBasedTM {
