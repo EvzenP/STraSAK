@@ -23,8 +23,8 @@ Command                 | Description
 **Export-TargetFiles**  | Export target files from specified project to specified location
 **Update-MainTMs**      | Update main translation memories of specified project
 **New-FileBasedTM**     | Create new translation memory in specified location, using specified options
-**Export-TMX**          | Export one or more Trados Studio translation memories to TMX
-**Import-TMX**          | Import content from TMX file in a specified TM
+**Export-TMX**          | Export one or more Trados Studio translation memories to TMX, optionally applying a filter
+**Import-TMX**          | Import content from TMX file in a specified TM, optionally applying a filter
 
 
 ## Technical info
@@ -37,17 +37,19 @@ The kit consists of:
 
 
 ## Installation and setup
-0. **Pre-requisite**: Windows PowerShell 4.0 or newer (https://www.microsoft.com/en-us/download/details.aspx?id=40855)
-_This may be required only for Windows 7 and 8._
-_**Windows 8.1 has PowerShell 4.0 already built-in, Windows 10 has PowerShell 5.0 already built-in.**_
-
+0. **Pre-requisite**: Windows PowerShell 4.0 or newer installed  
+_This may be required only for Windows 7 and 8._  
+_**Windows 8.1 has PowerShell 4.0 already built-in, Windows 10 has PowerShell 5.0 already built-in.**_  
+Download Powershell 4.0: https://www.microsoft.com/en-us/download/details.aspx?id=40855  
+Download Powershell 5.1: https://www.microsoft.com/en-us/download/details.aspx?id=54616  
 1. **Create `WindowsPowerShell` subfolder** in your `Documents` folder  
 (i.e. the result will be `C:\Users\<YourProfile>\Documents\WindowsPowerShell`)  
 **NOTE**: If you moved your Documents folder to another location, create the subfolder in that location.
 2. **Copy the entire `Modules` folder** (including the folder structure) into the created `WindowsPowerShell` folder.
-3. **Put the `TS2015.cmd` wrapper script** to any preferred location and **add the location to your PATH environment variable**, so that you can run the script without specifying its full path.  
+3. **Put the `TS2015.cmd` (`TS2017.cmd`, `TS2019.cmd`) wrapper script** to any preferred location and **add the location to your PATH environment variable**, so that you can run the script without specifying its full path.  
 See https://www.java.com/en/download/help/path.xml for more information about PATH variable and how to edit its content in different operating systems.  
-_(Optionally you can put the script to a location which is already listed in the PATH variable... but that may be uncomfortable, depeding on particular system setup, etc.)_
+_Note: Make sure to **add** the location to the existing value of PATH (separated by semicolon)... **do not replace** the existing value, otherwise some applications or your system may stop working properly!_  
+**Optionally you can put the wrapper script to a location which is already listed in the PATH variable** (e.g. `C:\WINDOWS`)... but that may be uncomfortable, depeding on particular system setup, etc.
 
 That's all... the kit is now ready for use!
 
@@ -73,8 +75,8 @@ Target languages list for "CreateProject", "ExportPackages" and "ExportFiles" sc
 `03_CreateProject.cmd "de-DE fr-FR it-IT"`
 *(language codes can be separated by space, comma or pipe)*
 
-==03_CreateProject.cmd==:
-```
+== 03_CreateProject.cmd ==
+```batchfile
 @echo off
 set TARGETLANGUAGES=%~1
 for %%D in ("%CD%") do set "PROJECTNAME=%%~nxD"
@@ -88,8 +90,8 @@ call TS2017 New-Project ^
      -ProjectTemplate "X:\Projects\My Project\_Template\MyProject.sdltpl" ^
      -Pretranslate -Analyze
 ```
-==04_ExportPackages.cmd==:
-```
+== 04_ExportPackages.cmd ==
+```batchfile
 @echo off
 set TARGETLANGUAGES=%~1
 call TS2017 Export-Package ^
@@ -98,15 +100,15 @@ call TS2017 Export-Package ^
      -TargetLanguages "%TARGETLANGUAGES%" ^
      -IncludeMainTMs -IncludeTermbases
 ```
-==05_ImportPackages.cmd==:
-```
+== 05_ImportPackages.cmd ==
+```batchfile
 @echo off
 call TS2017 Import-Package ^
      -ProjectLocation "03_Studio" ^
      -PackageLocation "05_FromTrans"
 ```
-==06_ExportFiles.cmd==:
-```
+== 06_ExportFiles.cmd ==
+```batchfile
 @echo off
 set TARGETLANGUAGES=%~1
 call TS2017 Export-TargetFiles ^
@@ -115,22 +117,16 @@ call TS2017 Export-TargetFiles ^
      -TargetLanguages "%TARGETLANGUAGES%"
 ```
 
-
 ## Known issues
 ### "log4net:ERROR: XmlConfigurator..." message displayed each time automation is started
 This is Trados Studio API bug. It's just a cosmetic issue and does not influence automation functionality.
-
-### No progress is displayed during Analysis task
-This seems to be a Trados Studio API bug – activating analysis progress display causes analysis task to completely fail.
-
-Currently the only known 'workaround' is to not display progress during analysis.
 
 ### Out Of Memory error during analysis or package creation  
 This seems to be caused by some weird memory leak in Studio API if a huge TM is used for analysis or for creating Project TM (either during project creation, or when a "Create new TM" package creation option is used), which may cause Out Of Memory exception.
 
 As a workaround you can try the `-PerLanguage` parameter of the `New-Project` function. Or you can try to use smaller/less TMs. Or both...
 
-### Automation fails if folder- or filename contains square brackets  
+### Automation fails if folder- or file name contains square brackets  
 This is PowerShell bug and there is currently no reasonable workaround... except for removing there characters from folder/file names.
 
 You can vote for fixing this bug at following links:  
@@ -139,6 +135,14 @@ https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/1597627
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
 ## Version history
+### STraSAK v1.6 &nbsp; &nbsp; &nbsp; (2019-09-15)
+* **Import-TMX** and **Export-TMX** commands can now apply filter during import/export
+* fixed `Multiple ambiguous overloads found` errors and no progress information displayed during TMX import/export with Studio 2017 SR1 CU13 and newer
+* progress information is now displayed also for Pre-translate Files and Analyze Files automatic tasks
+* **New-FilebasedTM** now optionally returns created TM object(s) using -PassThru switch
+* TM helper functions (`Get-TM...`) now accept also TM object as input, apart from TM file
+* internal refactoring
+
 ### STraSAK v1.5 &nbsp; &nbsp; &nbsp; (2019-07-03)
 * **New-FileBasedTM** command can now create multiple TMs at once
 
