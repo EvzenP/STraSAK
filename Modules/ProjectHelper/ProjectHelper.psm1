@@ -10,6 +10,49 @@ else {
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.FileBased.dll"
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.Core.dll"
 
+# Helper for handling PowerShell runspace issues with multithreaded event handlers
+# https://stackoverflow.com/questions/53788232/system-threading-timer-kills-the-powershell-console/53789011
+Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Management.Automation.Runspaces;
+
+public class RunspacedDelegateFactory
+{
+    public static Delegate NewRunspacedDelegate(Delegate _delegate, Runspace runspace)
+    {
+        Action setRunspace = () => Runspace.DefaultRunspace = runspace;
+
+        return ConcatActionToDelegate(setRunspace, _delegate);
+    }
+
+    private static Expression ExpressionInvoke(Delegate _delegate, params Expression[] arguments)
+    {
+        var invokeMethod = _delegate.GetType().GetMethod("Invoke");
+
+        return Expression.Call(Expression.Constant(_delegate), invokeMethod, arguments);
+    }
+
+    public static Delegate ConcatActionToDelegate(Action a, Delegate d)
+    {
+        var parameters =
+            d.GetType().GetMethod("Invoke").GetParameters()
+            .Select(p => Expression.Parameter(p.ParameterType, p.Name))
+            .ToArray();
+
+        Expression body = Expression.Block(ExpressionInvoke(a), ExpressionInvoke(d, parameters));
+
+        var lambda = Expression.Lambda(d.GetType(), body, parameters);
+
+        var compiled = lambda.Compile();
+
+        return compiled;
+    }
+}
+'@
+
 ##########################################################################################################
 # Due to API bug basing new projects on "Default.sdltpl" template instead of actual default project template,
 # we need to find the real default template configured in Trados Studio by reading the configuration files
@@ -247,7 +290,15 @@ Analyze task is run after scanning, converting and copying to target languages.
 			}
 		}
 	}
-
+	
+	# task progress event handler
+	$OnTaskProgress = ${function:Write-TaskProgress} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskStatusEventArgs]]
+	$OnTaskProgressDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskProgress, [Runspace]::DefaultRunspace)
+	
+	# task messages event handler
+	$OnTaskMessage = ${function:Write-TaskMessage} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskMessageEventArgs]]
+	$OnTaskMessageDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskMessage, [Runspace]::DefaultRunspace)
+	
 	# scriptblock for running automatic tasks (see below)
 	$ProcessAutomaticTasks = {
 		
@@ -261,12 +312,7 @@ Analyze task is run after scanning, converting and copying to target languages.
 		}
 		
 		# run (and then validate) the task sequence
-		if ($TaskSequence -contains [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PreTranslateFiles -or $TaskSequence -contains [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::AnalyzeFiles) {
-			$Tasks = $Project.RunAutomaticTasks($TargetFilesGuids, $TaskSequence, $null, ${function:Write-TaskMessage})
-		}
-		else {
-			$Tasks = $Project.RunAutomaticTasks($TargetFilesGuids, $TaskSequence, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
-		}
+		$Tasks = $Project.RunAutomaticTasks($TargetFilesGuids, $TaskSequence, $OnTaskProgressDelegate, $OnTaskMessageDelegate)
 		Validate-TaskSequence $Tasks
 		
 		# save analysis logs
@@ -334,11 +380,11 @@ Analyze task is run after scanning, converting and copying to target languages.
 	# Run preparation tasks
 	Write-Host "`nRunning preparation tasks..." -ForegroundColor White
 	Write-Host "Task Scan"
-	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::Scan, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::Scan, $OnTaskProgressDelegate, $OnTaskMessageDelegate)
 	Write-Host "Task Convert to Translatable Format"
-	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::ConvertToTranslatableFormat, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::ConvertToTranslatableFormat, $OnTaskProgressDelegate, $OnTaskMessageDelegate)
 	Write-Host "Task Copy to Target Languages"
-	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::CopyToTargetLanguages, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	Validate-Task $Project.RunAutomaticTask($SourceFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::CopyToTargetLanguages, $OnTaskProgressDelegate, $OnTaskMessageDelegate)
 	Write-Host "Done"
 
 	if ($PerfectMatch) {
@@ -746,8 +792,16 @@ files will be created in "D:\Export" folder.
 		$TargetFilesGuids += Get-Guids $TargetFiles
 	}
 	
+	# task progress event handler
+	$OnTaskProgress = ${function:Write-TaskProgress} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskStatusEventArgs]]
+	$OnTaskProgressDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskProgress, [Runspace]::DefaultRunspace)
+	
+	# task messages event handler
+	$OnTaskMessage = ${function:Write-TaskMessage} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskMessageEventArgs]]
+	$OnTaskMessageDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskMessage, [Runspace]::DefaultRunspace)
+	
 	# run (and then validate) the task sequence
-	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::ExportFiles, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::ExportFiles, $OnTaskProgressDelegate, $OnTaskMessageDelegate)
 	Validate-Task $Task
 }
 
@@ -800,8 +854,16 @@ Updates main TMs for Finnish and Swedish languages from project located in "D:\P
 		$TargetFilesGuids += Get-Guids $TargetFiles
 	}
 	
+	# task progress event handler
+	$OnTaskProgress = ${function:Write-TaskProgress} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskStatusEventArgs]]
+	$OnTaskProgressDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskProgress, [Runspace]::DefaultRunspace)
+	
+	# task messages event handler
+	$OnTaskMessage = ${function:Write-TaskMessage} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskMessageEventArgs]]
+	$OnTaskMessageDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskMessage, [Runspace]::DefaultRunspace)
+	
 	# run (and then validate) the task sequence
-	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::UpdateMainTranslationMemories, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::UpdateMainTranslationMemories, $OnTaskProgressDelegate, $OnTaskMessageDelegate)
 	Validate-Task $Task
 
 	Write-Host "Done"
@@ -932,8 +994,16 @@ Pseudo-translates Finnish and Swedish languages from project located in "D:\Proj
 		$TargetFilesGuids += Get-Guids $TargetFiles
 	}
 	
+	# task progress event handler
+	$OnTaskProgress = ${function:Write-TaskProgress} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskStatusEventArgs]]
+	$OnTaskProgressDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskProgress, [Runspace]::DefaultRunspace)
+	
+	# task messages event handler
+	$OnTaskMessage = ${function:Write-TaskMessage} -as [System.EventHandler[Sdl.ProjectAutomation.Core.TaskMessageEventArgs]]
+	$OnTaskMessageDelegate = [RunspacedDelegateFactory]::NewRunspacedDelegate($OnTaskMessage, [Runspace]::DefaultRunspace)
+	
 	# run (and then validate) the task sequence
-	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PseudoTranslateFiles, ${function:Write-TaskProgress}, ${function:Write-TaskMessage})
+	$Task = $Project.RunAutomaticTask($TargetFilesGuids, [Sdl.ProjectAutomation.Core.AutomaticTaskTemplateIds]::PseudoTranslateFiles, $OnTaskProgressDelegate, $OnTaskMessageDelegate)
 	Validate-Task $Task
 
 	Write-Host "Done"
