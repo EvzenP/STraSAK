@@ -135,6 +135,10 @@ https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/1597627
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
 ## Version history
+### STraSAK v1.7 &nbsp; &nbsp; &nbsp; (2019-10-11)
+* Improved detection of default project template _(it works now correctly with Studio 2019 SR1 and newer, which broke the way it worked reliably for years :( )_
+* **Import-TMX** command now displays separate progress information for each import phase
+
 ### STraSAK v1.6 &nbsp; &nbsp; &nbsp; (2019-09-15)
 * **Import-TMX** and **Export-TMX** commands can now apply filter during import/export
 * fixed `Multiple ambiguous overloads found` errors and no progress information displayed during TMX import/export with Studio 2017 SR1 CU13 and newer
