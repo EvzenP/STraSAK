@@ -564,6 +564,12 @@ Only translation units meeting criteria defined in the "Word 2016" filter will b
 		$RawTUs = $Stats.RawTUs
 		$Message = "TUs raw: $RawTUs, processed: $TotalRead, imported: $TotalImported (added: $TotalAdded, merged: $TotalMerged, overwritten: $TotalOverwritten), discarded: $TotalDiscarded, errors: $TotalErrors, bad: $TotalBad"
 		
+		# keep results of each phase on separate line
+		if ($TotalRead -lt $script:LastTotal) {
+			Write-Host $null
+		}
+		$script:LastTotal = $TotalRead
+		
 		# workaround for overwriting longer text with shorter text
 		# (this happens because the import may consist of multiple background phases in Studio API)
 		$LineLength = $Host.UI.RawUI.WindowSize.Width
@@ -598,6 +604,8 @@ Only translation units meeting criteria defined in the "Word 2016" filter will b
 		$FilterExpr = [Sdl.LanguagePlatform.TranslationMemory.FilterExpressionParser]::Parse($FilterString, $TM.FieldDefinitions)
 		$Importer.ImportSettings.Filter = $FilterExpr
 	}
+	
+	$LastTotal = 0
 	
 	# Register import event handler, do the import and unregister event handler afterwards
 	$Importer.add_BatchImported($OnBatchImportedDelegate)
