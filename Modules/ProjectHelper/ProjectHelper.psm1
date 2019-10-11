@@ -9,6 +9,7 @@ else {
 
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.FileBased.dll"
 Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.Core.dll"
+Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectApi.dll"
 
 # Helper for handling PowerShell runspace issues with multithreaded event handlers
 # https://stackoverflow.com/questions/53788232/system-threading-timer-kills-the-powershell-console/53789011
@@ -53,25 +54,38 @@ public class RunspacedDelegateFactory
 }
 '@
 
-##########################################################################################################
-# Due to API bug basing new projects on "Default.sdltpl" template instead of actual default project template,
-# we need to find the real default template configured in Trados Studio by reading the configuration files
-switch ($StudioVersion) {
-	"Studio2"  {$StudioVersionAppData = "10.0.0.0"}
-	"Studio3"  {$StudioVersionAppData = "11.0.0.0"}
-	"Studio4"  {$StudioVersionAppData = "12.0.0.0"}
-	"Studio5"  {$StudioVersionAppData = "14.0.0.0"}
-	"Studio15" {$StudioVersionAppData = "15.0.0.0"}
-}
-# Get default project template GUID from the user settings file
-$DefaultProjectTemplateGuid = (Select-Xml -Path "${Env:AppData}\SDL\SDL Trados Studio\$StudioVersionAppData\UserSettings.xml" -XPath "//Setting[@Id='DefaultProjectTemplateGuid']").Node.InnerText
-# Get the location of local projects storage from ProjectApi configuration file
-$LocalDataFolder = (Select-Xml -Path "${Env:AppData}\SDL\ProjectApi\$StudioVersionAppData\SDL.ProjectApi.xml" -XPath "//LocalProjectServerInfo/@LocalDataFolder").Node.Value
-# Finally, get the default project template path from local project storage file
-$DefaultProjectTemplate = (Select-Xml -Path "$LocalDataFolder\projects.xml" -XPath "//ProjectTemplateListItem[@Guid='$DefaultProjectTemplateGuid']/@ProjectTemplateFilePath").Node.Value
-##########################################################################################################
-
 $LanguagesSeparator = "\s+|;\s*|,\s*"
+
+function Get-DefaultProjectTemplate {
+	##########################################################################################################
+	# Due to API bug basing new projects on "Default.sdltpl" template instead of actual default project template,
+	# we need to find the real default template configured in Trados Studio by reading the configuration files
+	switch ($StudioVersion) {
+		"Studio2"  {
+			$StudioVersionAppData = "10.0.0.0"
+		}
+		"Studio3"  {
+			$StudioVersionAppData = "11.0.0.0"
+		}
+		"Studio4"  {
+			$StudioVersionAppData = "12.0.0.0"
+		}
+		"Studio5"  {
+			$StudioVersionAppData = "14.0.0.0"
+		}
+		"Studio15" {
+			$StudioVersionAppData = "15.0.0.0"
+		}
+	}
+	# Get default project template GUID from the user settings file
+	$UserSettingsFilePath = "${Env:AppData}\SDL\SDL Trados Studio\$StudioVersionAppData\UserSettings.xml"
+	$DefaultProjectTemplateGuid = (Select-Xml -Path $UserSettingsFilePath -XPath "//Setting[@Id='DefaultProjectTemplateGuid']").Node.InnerText
+	# Get user's project templates and get the default one using the GUID
+	$ProjectTemplates = [Sdl.ProjectApi.ApplicationFactory]::CreateApplication().LocalProjectServers[0].ProjectTemplates
+	$DefaultProjectTemplate = ($ProjectTemplates | Where-Object -Property Guid -eq $DefaultProjectTemplateGuid).FilePath
+	
+	return $DefaultProjectTemplate
+}
 
 function New-Project {
 <#
@@ -161,7 +175,7 @@ Analyze task is run after scanning, converting and copying to target languages.
 		# If this parameter is not specified, default project template set in Trados Studio will be used.
 		[Parameter (ParameterSetName = "ProjectTemplate")]
 		[Alias("PrjTpl")]
-		[String] $ProjectTemplate = $DefaultProjectTemplate,
+		[String] $ProjectTemplate = $(Get-DefaultProjectTemplate),
 
 		# Path to project file (*.sdlproj) on which the created project will be based.
 		[Parameter (ParameterSetName = "ProjectReference")]
@@ -1108,3 +1122,4 @@ Export-ModuleMember Update-MainTMs
 Export-ModuleMember PseudoTranslate -Alias Pseudo
 Export-ModuleMember Get-BilingualFileMappings
 Export-ModuleMember Get-TaskFileInfoFiles
+Export-ModuleMember Get-DefaultProjectTemplate
