@@ -56,27 +56,20 @@ public class RunspacedDelegateFactory
 
 $LanguagesSeparator = "\s+|;\s*|,\s*"
 
+$StudioVersionsMap = @{
+	Studio2  = "10.0.0.0"
+	Studio3  = "11.0.0.0"
+	Studio4  = "12.0.0.0"
+	Studio5  = "14.0.0.0"
+	Studio15 = "15.0.0.0"
+	Studio16 = "16.0.0.0"
+}
+
 function Get-DefaultProjectTemplate {
 	##########################################################################################################
 	# Due to API bug basing new projects on "Default.sdltpl" template instead of actual default project template,
 	# we need to find the real default template configured in Trados Studio by reading the configuration files
-	switch ($StudioVersion) {
-		"Studio2"  {
-			$StudioVersionAppData = "10.0.0.0"
-		}
-		"Studio3"  {
-			$StudioVersionAppData = "11.0.0.0"
-		}
-		"Studio4"  {
-			$StudioVersionAppData = "12.0.0.0"
-		}
-		"Studio5"  {
-			$StudioVersionAppData = "14.0.0.0"
-		}
-		"Studio15" {
-			$StudioVersionAppData = "15.0.0.0"
-		}
-	}
+	$StudioVersionAppData = $StudioVersionsMap[$StudioVersion]
 	# Get default project template GUID from the user settings file
 	$UserSettingsFilePath = "${Env:AppData}\SDL\SDL Trados Studio\$StudioVersionAppData\UserSettings.xml"
 	$DefaultProjectTemplateGuid = (Select-Xml -Path $UserSettingsFilePath -XPath "//Setting[@Id='DefaultProjectTemplateGuid']").Node.InnerText
