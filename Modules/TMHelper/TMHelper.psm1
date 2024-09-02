@@ -1,14 +1,4 @@
-﻿param([String]$StudioVersion = "Studio5")
-
-if ("${Env:ProgramFiles(x86)}") {
-    $ProgramFilesDir = "${Env:ProgramFiles(x86)}"
-}
-else {
-    $ProgramFilesDir = "${Env:ProgramFiles}"
-}
-
-Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.LanguagePlatform.TranslationMemoryApi.dll"
-Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.LanguagePlatform.TranslationMemory.dll"
+﻿param ([string] $studioVersion = "Studio18")
 
 # Helper for handling PowerShell runspace issues with multithreaded event handlers
 # https://stackoverflow.com/questions/53788232/system-threading-timer-kills-the-powershell-console/53789011
@@ -203,8 +193,10 @@ Creates "Contoso Main en-US_de-DE.sdltm", "Contoso Main en-US_fr-FR.sdltm" and "
 			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers)
 		} elseif ($_StudioVersion -eq 4) {
 			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers, $TokenizerFlags, $WordCountFlags)
-		} else {
+		} elseif ($_StudioVersion -le 16) {
 			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers, $TokenizerFlags, $WordCountFlags, $true)
+		} else {
+			$TM = New-Object Sdl.LanguagePlatform.TranslationMemoryApi.FileBasedTranslationMemory ($TMPath, $Description, $TMSourceLanguage, $TMTargetLanguage, $FuzzyIndexes, $Recognizers, $TokenizerFlags, $WordCountFlags)
 		}
 		
 		# Add the created TM to output array (if exists)
@@ -748,13 +740,13 @@ Export-ModuleMember Get-DefaultFuzzyIndexes
 Export-ModuleMember Get-DefaultRecognizers
 Export-ModuleMember Get-DefaultTokenizerFlags
 Export-ModuleMember Get-DefaultWordCountFlags
-Export-ModuleMember Get-Language
-Export-ModuleMember Get-Languages
+Export-ModuleMember Get-Language 
+Export-ModuleMember Get-Languages 
 Export-ModuleMember Get-TMSourceLanguage
-Export-ModuleMember Get-TMTargetLanguage
-Export-ModuleMember Get-TMFuzzyIndexes
+Export-ModuleMember Get-TMTargetLanguage 
+Export-ModuleMember Get-TMFuzzyIndexes 
 Export-ModuleMember Get-TMRecognizers
-Export-ModuleMember Get-TMTokenizerFlags
+Export-ModuleMember Get-TMTokenizerFlags 
 Export-ModuleMember Get-TMWordCountFlags
 Export-ModuleMember Import-TMX
 Export-ModuleMember Export-TMX

@@ -118,6 +118,7 @@ call TS2017 Export-TargetFiles ^
 ```
 
 ## Known issues
+
 ### "log4net:ERROR: XmlConfigurator..." message displayed each time automation is started
 This is Trados Studio API bug. It's just a cosmetic issue and does not influence automation functionality.
 
@@ -135,6 +136,9 @@ https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/1597627
 https://windowsserver.uservoice.com/forums/301869-powershell/suggestions/11088702-start-process-doesn-t-work-if-in-a-directory-name
 
 ## Version history
+### STraSAK v1.9 &nbsp; &nbsp; &nbsp; (2024-07-12)
+* Added support for Studio 2022 and Studio 2024
+
 ### STraSAK v1.8 &nbsp; &nbsp; &nbsp; (2021-01-13)
 * Added support for Studio 2021
 

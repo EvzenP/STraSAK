@@ -1,19 +1,4 @@
-﻿param([String]$StudioVersion = "Studio5")
-
-if ("${Env:ProgramFiles(x86)}") {
-    $ProgramFilesDir = "${Env:ProgramFiles(x86)}"
-}
-else {
-    $ProgramFilesDir = "${Env:ProgramFiles}"
-}
-
-Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.FileBased.dll"
-Add-Type -Path "$ProgramFilesDir\SDL\SDL Trados Studio\$StudioVersion\Sdl.ProjectAutomation.Core.dll"
-
-$LanguagesSeparator = "\s+|;\s*|,\s*"
-
-$ProjectPackageExtension = ".sdlppx"
-$ReturnPackageExtension = ".sdlrpx"
+﻿param ([string] $studioVersion = "Studio18")
 
 function Export-Package {
 <#
